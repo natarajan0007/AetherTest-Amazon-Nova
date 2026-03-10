@@ -196,6 +196,146 @@ class MemoryService:
             "consolidations": [c.to_dict() for c in consolidations],
             "total_found": len(relevant),
         }
+    
+    async def query_memories_with_ai(self, question: str) -> dict:
+        """Query memories using AI to generate intelligent answers.
+        
+        Uses Bedrock to analyze memories and generate a natural language response.
+        """
+        import boto3
+        from botocore.config import Config
+        from ..config import get_settings
+        import json
+        
+        settings = get_settings()
+        
+        # Search for relevant memories
+        relevant = self.search_memories(question, limit=15)
+        
+        # Get recent consolidations for context
+        consolidations = self.get_consolidation_history(limit=5)
+        
+        # Get overall stats
+        stats = self.get_stats()
+        
+        # If no memories, return early
+        if not relevant and stats.total_memories == 0:
+            return {
+                "question": question,
+                "answer": "No memories stored yet. Run some tests first to build up the memory layer.",
+                "relevant_memories": [],
+                "sources_used": 0,
+                "ai_generated": False,
+            }
+        
+        # Build context from memories
+        memory_context = "## Relevant Test Session Memories:\n\n"
+        for i, m in enumerate(relevant, 1):
+            memory_context += f"### Memory {i} (importance: {m.importance:.1f}, source: {m.source})\n"
+            memory_context += f"**Summary:** {m.summary}\n"
+            memory_context += f"**Details:** {m.raw_text[:500]}{'...' if len(m.raw_text) > 500 else ''}\n"
+            if m.entities:
+                memory_context += f"**Entities:** {', '.join(m.entities)}\n"
+            if m.topics:
+                memory_context += f"**Topics:** {', '.join(m.topics)}\n"
+            memory_context += f"**Timestamp:** {m.timestamp}\n\n"
+        
+        if consolidations:
+            memory_context += "## Consolidated Insights:\n\n"
+            for c in consolidations:
+                memory_context += f"- **Insight:** {c.insight}\n"
+                memory_context += f"  **Summary:** {c.summary}\n\n"
+        
+        # Add stats context
+        memory_context += f"\n## Memory Statistics:\n"
+        memory_context += f"- Total memories: {stats.total_memories}\n"
+        memory_context += f"- Total consolidations: {stats.total_consolidations}\n"
+        memory_context += f"- Pending consolidation: {stats.pending_consolidation}\n"
+        
+        # Check if AWS credentials are available
+        if not settings.aws_access_key_id or not settings.aws_secret_access_key:
+            # Fallback to simple response without AI
+            return {
+                "question": question,
+                "answer": f"Found {len(relevant)} relevant memories. AWS credentials not configured for AI analysis.",
+                "relevant_memories": [m.to_dict() for m in relevant],
+                "sources_used": len(relevant),
+                "ai_generated": False,
+            }
+        
+        # Create Bedrock client
+        try:
+            bedrock_config = Config(
+                region_name=settings.aws_region,
+                retries={'max_attempts': 3, 'mode': 'adaptive'}
+            )
+            
+            session_kwargs = {
+                'aws_access_key_id': settings.aws_access_key_id,
+                'aws_secret_access_key': settings.aws_secret_access_key,
+                'region_name': settings.aws_region
+            }
+            if settings.aws_session_token:
+                session_kwargs['aws_session_token'] = settings.aws_session_token
+            
+            boto_session = boto3.Session(**session_kwargs)
+            bedrock_client = boto_session.client('bedrock-runtime', config=bedrock_config)
+            
+            # Build the prompt
+            system_prompt = """You are AetherTest's Memory Analyst. Your job is to analyze test session memories and provide insightful answers to questions about past testing activities.
+
+When answering:
+1. Be specific and cite relevant memories
+2. Highlight patterns, trends, and learnings
+3. Provide actionable insights when possible
+4. If asked about failures, explain what went wrong and suggest improvements
+5. Keep responses concise but informative"""
+
+            user_prompt = f"""Based on the following test session memories, please answer this question:
+
+**Question:** {question}
+
+{memory_context}
+
+Please provide a clear, insightful answer based on the memories above. If the memories don't contain relevant information, say so."""
+
+            # Call Bedrock
+            response = bedrock_client.converse(
+                modelId="amazon.nova-lite-v1:0",  # Use Nova Lite for fast responses
+                messages=[{"role": "user", "content": [{"text": user_prompt}]}],
+                system=[{"text": system_prompt}],
+                inferenceConfig={"maxTokens": 1000}
+            )
+            
+            # Extract answer
+            output = response.get('output', {})
+            message_content = output.get('message', {})
+            content_blocks = message_content.get('content', [])
+            
+            answer = ""
+            for block in content_blocks:
+                if 'text' in block:
+                    answer += block['text']
+            
+            return {
+                "question": question,
+                "answer": answer or "Unable to generate answer from memories.",
+                "relevant_memories": [m.to_dict() for m in relevant[:5]],  # Return top 5
+                "sources_used": len(relevant),
+                "ai_generated": True,
+                "model": "amazon.nova-lite-v1:0",
+            }
+            
+        except Exception as e:
+            logger.error(f"AI query failed: {e}")
+            return {
+                "question": question,
+                "answer": f"AI analysis failed: {str(e)}. Found {len(relevant)} relevant memories.",
+                "relevant_memories": [m.to_dict() for m in relevant],
+                "sources_used": len(relevant),
+                "ai_generated": False,
+                "error": str(e),
+            }
 
 
 # ── Singleton accessor ─────────────────────────────────────────────────────────

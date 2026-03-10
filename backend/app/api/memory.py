@@ -192,13 +192,14 @@ async def search_memories(q: str, limit: int = 10):
 
 @router.post("/query")
 async def query_memories(request: QueryRequest):
-    """Query memories to answer a question."""
+    """Query memories using AI to generate intelligent answers."""
     try:
         if not request.question.strip():
             raise HTTPException(status_code=400, detail="Question cannot be empty")
         
         svc = get_memory_service()
-        result = svc.query_memories(question=request.question)
+        # Use AI-powered query
+        result = await svc.query_memories_with_ai(question=request.question)
         return result
     except HTTPException:
         raise

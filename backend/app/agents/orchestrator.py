@@ -274,6 +274,56 @@ Test Cases Generated: {len(test_cases)}
         except Exception as e:
             logger.warning(f"{sid} Failed to store session memory: {e}")
 
+    async def _store_failure_memory(
+        self,
+        session_id: str,
+        status: str,
+        error_message: str,
+    ) -> None:
+        """Store failure information in memory so agent learns from errors."""
+        sid = _sid(session_id)
+        try:
+            # Only store if we have meaningful context
+            if not self._current_requirement and not self._current_target_url:
+                logger.info(f"{sid} No context to store for failed session")
+                return
+            
+            # Build failure memory
+            raw_text = f"""FAILED Test Session for: {self._current_target_url}
+Requirement: {self._current_requirement}
+Status: {status}
+Error: {error_message}
+Test Cases Generated: {len(self._test_cases)}
+Test Results Collected: {len(self._test_results)}
+"""
+            # Add any partial results
+            if self._test_results:
+                passed = sum(1 for r in self._test_results if r.get("verdict") == "PASS")
+                failed = sum(1 for r in self._test_results if r.get("verdict") == "FAIL")
+                raw_text += f"Partial Results: {passed} passed, {failed} failed before failure\n"
+            
+            summary = f"FAILED: '{self._current_requirement[:30]}...' on {self._current_target_url}. Error: {error_message[:50]}..."
+            
+            # Extract domain
+            from urllib.parse import urlparse
+            domain = urlparse(self._current_target_url).netloc if self._current_target_url else ""
+            entities = [domain] if domain else []
+            
+            # High importance for failures - critical learnings
+            result = self.memory_svc.store_memory(
+                raw_text=raw_text,
+                summary=summary,
+                entities=entities,
+                topics=["failure", "error", status],
+                importance=0.95,  # Very high - failures are critical learnings
+                source=f"session:{session_id[:8]}:failed",
+            )
+            
+            logger.info(f"{sid} Stored failure in memory (id={result.get('memory_id')})")
+            
+        except Exception as e:
+            logger.warning(f"{sid} Failed to store failure memory: {e}")
+
     # ── Public entry point ────────────────────────────────────────────────────
 
     async def run(
@@ -321,11 +371,15 @@ Test Cases Generated: {len(test_cases)}
             logger.warning(f"{sid} Pipeline CANCELLED by user")
             await self.ws.send_cancelled(session_id)
             await self.session_svc.update_session(session_id, SessionUpdate(status="cancelled"))
+            # Store partial learnings even on cancellation
+            await self._store_failure_memory(session_id, "cancelled", "Pipeline cancelled by user")
             raise
         except Exception as e:
             logger.exception(f"{sid} Pipeline FAILED — {type(e).__name__}: {e}")
             await self.ws.send_error(session_id, f"Pipeline error: {e}")
             await self.session_svc.update_session(session_id, SessionUpdate(status="failed"))
+            # Store failure in memory so agent learns from errors
+            await self._store_failure_memory(session_id, "failed", str(e))
         finally:
             # ── Stop recording in all exit paths ──────────────────────────────
             stop_result = await self.recording_svc.stop(session_id)
@@ -730,8 +784,8 @@ Test Cases Generated: {len(test_cases)}
                 # Use tracked requirement and URL from pipeline start
                 await self._store_session_memory(
                     session_id=session_id,
-                    requirement=getattr(self, '_current_requirement', req) or req,
-                    target_url=getattr(self, '_current_target_url', url) or url,
+                    requirement=self._current_requirement,
+                    target_url=self._current_target_url,
                     test_cases=self._test_cases,
                     test_results=self._test_results,
                     quality_score=quality,

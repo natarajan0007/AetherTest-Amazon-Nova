@@ -397,10 +397,12 @@ export default function MemoryDashboard() {
             {/* Sample questions */}
             <div className="grid grid-cols-2 gap-2 mt-4">
               {[
-                'What are the main themes across everything?',
-                'What patterns do you see?',
-                'Summarize in 3 bullet points',
-                'What should I focus on?',
+                'How well did the agent perform on recent tests?',
+                'What failures or issues occurred?',
+                'What patterns do you see in test results?',
+                'What should I focus on improving?',
+                'Summarize all test sessions',
+                'Which URLs have been tested?',
               ].map((q, i) => (
                 <button
                   key={i}
@@ -417,15 +419,72 @@ export default function MemoryDashboard() {
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-6 p-4 bg-blue-900/20 border border-blue-700/50 rounded-lg"
+                className="mt-6 space-y-4"
               >
-                <p className="text-gray-400 text-sm mb-2">Found {queryResult.total_found} relevant memories</p>
-                {queryResult.relevant_memories?.map((m: Memory) => (
-                  <div key={m.id} className="p-3 bg-gray-900/50 rounded-lg mb-2">
-                    <p className="text-sm text-gray-300">{m.summary}</p>
-                    <p className="text-xs text-gray-500 mt-1">Memory #{m.id}</p>
+                {/* AI Answer */}
+                {queryResult.answer && (
+                  <div className="p-4 bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 rounded-lg">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Brain className="text-purple-400" size={20} />
+                      <span className="font-semibold text-purple-300">AI Analysis</span>
+                      {queryResult.ai_generated && (
+                        <span className="px-2 py-0.5 bg-green-900/50 text-green-400 text-xs rounded-full">
+                          ✨ AI Generated
+                        </span>
+                      )}
+                      {queryResult.model && (
+                        <span className="text-xs text-gray-500 ml-auto">{queryResult.model}</span>
+                      )}
+                    </div>
+                    <div className="text-gray-200 whitespace-pre-wrap leading-relaxed">
+                      {queryResult.answer}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-3">
+                      Based on {queryResult.sources_used || 0} memories
+                    </p>
                   </div>
-                ))}
+                )}
+
+                {/* Source Memories */}
+                {queryResult.relevant_memories?.length > 0 && (
+                  <div>
+                    <p className="text-gray-400 text-sm mb-2 flex items-center gap-2">
+                      <Search size={14} /> Source Memories ({queryResult.relevant_memories.length})
+                    </p>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {queryResult.relevant_memories.map((m: Memory) => (
+                        <div key={m.id} className="p-3 bg-gray-900/50 border border-gray-700 rounded-lg">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs text-gray-500">#{m.id}</span>
+                            {m.source && (
+                              <span className="text-xs text-purple-400">{m.source}</span>
+                            )}
+                            <span className="text-xs text-gray-600 ml-auto">
+                              importance: {(m.importance * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-300">{m.summary}</p>
+                          {m.topics?.length > 0 && (
+                            <div className="flex gap-1 mt-2">
+                              {m.topics.slice(0, 3).map((t, i) => (
+                                <span key={i} className="px-1.5 py-0.5 bg-purple-900/30 text-purple-300 text-xs rounded">
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Error */}
+                {queryResult.error && (
+                  <div className="p-3 bg-red-900/20 border border-red-700/50 rounded-lg text-red-300 text-sm">
+                    ⚠️ {queryResult.error}
+                  </div>
+                )}
               </motion.div>
             )}
           </div>
