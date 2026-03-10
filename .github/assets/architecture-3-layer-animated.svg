@@ -1,0 +1,208 @@
+<svg width="900" height="650" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <linearGradient id="layer1Gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:0.9" />
+            <stop offset="100%" style="stop-color:#1d4ed8;stop-opacity:0.9" />
+        </linearGradient>
+
+        <linearGradient id="layer2Gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:0.9" />
+            <stop offset="100%" style="stop-color:#6d28d9;stop-opacity:0.9" />
+        </linearGradient>
+
+        <linearGradient id="layer3Gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#06b6d4;stop-opacity:0.9" />
+            <stop offset="100%" style="stop-color:#0891b2;stop-opacity:0.9" />
+        </linearGradient>
+
+        <filter id="glow">
+            <feGaussianBlur stdDeviation="4" result="coloredBlur" />
+            <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+            </feMerge>
+        </filter>
+
+        <filter id="dropShadow">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="3" />
+            <feOffset dx="2" dy="2" result="offsetblur" />
+            <feComponentTransfer>
+                <feFuncA type="linear" slope="0.4" />
+            </feComponentTransfer>
+            <feMerge>
+                <feMergeNode />
+                <feMergeNode in="SourceGraphic" />
+            </feMerge>
+        </filter>
+    </defs>
+
+    <!-- Background -->
+    <rect width="900" height="650" fill="#0a0f1e" />
+
+    <!-- Title -->
+    <text x="450" y="40" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="bold"
+        fill="#e2e8f0">
+        Zero-Touch AI Testing Architecture
+    </text>
+
+    <!-- LAYER 01 - INTAKE -->
+    <g>
+        <rect x="50" y="80" width="800" height="120" rx="12" fill="url(#layer1Gradient)" filter="url(#dropShadow)"
+            stroke="#60a5fa" stroke-width="2">
+            <animate attributeName="stroke-opacity" values="1;0.5;1" dur="3s" repeatCount="indefinite" />
+        </rect>
+
+        <text x="80" y="115" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="white">
+            LAYER 01 — INTAKE
+        </text>
+
+        <text x="80" y="145" font-family="Arial, sans-serif" font-size="14" fill="#dbeafe">
+            User types: "Test the login flow on https://myapp.com"
+        </text>
+
+        <text x="80" y="170" font-family="Arial, sans-serif" font-size="12" fill="#93c5fd">
+            Accepts: Figma URL | Requirements text | Web App URL
+        </text>
+
+        <!-- Input animation -->
+        <circle cx="750" cy="140" r="8" fill="#60a5fa" filter="url(#glow)">
+            <animate attributeName="r" values="8;12;8" dur="2s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0.6;1;0.6" dur="2s" repeatCount="indefinite" />
+        </circle>
+    </g>
+
+    <!-- Arrow 1 -->
+    <g>
+        <path d="M 450 200 L 450 260" stroke="#60a5fa" stroke-width="4" fill="none" opacity="0.8" />
+        <polygon points="450,260 445,250 455,250" fill="#60a5fa" opacity="0.8" />
+
+        <!-- Data packet flowing down -->
+        <circle r="6" fill="#60a5fa" filter="url(#glow)">
+            <animateMotion dur="2s" repeatCount="indefinite" path="M 450 200 L 450 260" />
+            <animate attributeName="opacity" values="0;1;0" dur="2s" repeatCount="indefinite" />
+        </circle>
+    </g>
+
+    <!-- LAYER 02 - COGNITIVE -->
+    <g>
+        <rect x="50" y="270" width="800" height="180" rx="12" fill="url(#layer2Gradient)" filter="url(#dropShadow)"
+            stroke="#a78bfa" stroke-width="2">
+            <animate attributeName="stroke-opacity" values="1;0.5;1" dur="3s" begin="0.5s" repeatCount="indefinite" />
+        </rect>
+
+        <text x="80" y="305" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="white">
+            LAYER 02 — COGNITIVE
+        </text>
+
+        <text x="80" y="330" font-family="Arial, sans-serif" font-size="13" fill="#e9d5ff">
+            🧠 Claude Sonnet 4.6 + NVIDIA Nemotron
+        </text>
+
+        <!-- Four cognitive activities -->
+        <g>
+            <text x="100" y="365" font-family="Arial, sans-serif" font-size="12" fill="#ddd6fe">
+                • Structures requirements → testable criteria
+            </text>
+            <circle cx="85" cy="362" r="4" fill="#a78bfa" opacity="0">
+                <animate attributeName="opacity" values="0;1;0" dur="4s" repeatCount="indefinite" />
+            </circle>
+        </g>
+
+        <g>
+            <text x="100" y="390" font-family="Arial, sans-serif" font-size="12" fill="#ddd6fe">
+                • Generates natural-language BDD test cases
+            </text>
+            <circle cx="85" cy="387" r="4" fill="#a78bfa" opacity="0">
+                <animate attributeName="opacity" values="0;1;0" dur="4s" begin="1s" repeatCount="indefinite" />
+            </circle>
+        </g>
+
+        <g>
+            <text x="100" y="415" font-family="Arial, sans-serif" font-size="12" fill="#ddd6fe">
+                • Analyzes screenshots with Vision AI
+            </text>
+            <circle cx="85" cy="412" r="4" fill="#a78bfa" opacity="0">
+                <animate attributeName="opacity" values="0;1;0" dur="4s" begin="2s" repeatCount="indefinite" />
+            </circle>
+        </g>
+
+        <g>
+            <text x="100" y="440" font-family="Arial, sans-serif" font-size="12" fill="#ddd6fe">
+                • Issues PASS/FAIL verdicts on visual evidence
+            </text>
+            <circle cx="85" cy="437" r="4" fill="#a78bfa" opacity="0">
+                <animate attributeName="opacity" values="0;1;0" dur="4s" begin="3s" repeatCount="indefinite" />
+            </circle>
+        </g>
+
+        <!-- AI thinking animation -->
+        <g transform="translate(700, 360)">
+            <circle cx="0" cy="0" r="6" fill="#c4b5fd">
+                <animate attributeName="cy" values="0;-10;0" dur="1.5s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="20" cy="0" r="6" fill="#c4b5fd">
+                <animate attributeName="cy" values="0;-10;0" dur="1.5s" begin="0.2s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="40" cy="0" r="6" fill="#c4b5fd">
+                <animate attributeName="cy" values="0;-10;0" dur="1.5s" begin="0.4s" repeatCount="indefinite" />
+            </circle>
+        </g>
+    </g>
+
+    <!-- Arrow 2 -->
+    <g>
+        <path d="M 450 450 L 450 510" stroke="#a78bfa" stroke-width="4" fill="none" opacity="0.8" />
+        <polygon points="450,510 445,500 455,500" fill="#a78bfa" opacity="0.8" />
+
+        <!-- Data packet flowing down -->
+        <circle r="6" fill="#a78bfa" filter="url(#glow)">
+            <animateMotion dur="2s" begin="0.5s" repeatCount="indefinite" path="M 450 450 L 450 510" />
+            <animate attributeName="opacity" values="0;1;0" dur="2s" begin="0.5s" repeatCount="indefinite" />
+        </circle>
+    </g>
+
+    <!-- LAYER 03 - EXECUTION -->
+    <g>
+        <rect x="50" y="520" width="800" height="110" rx="12" fill="url(#layer3Gradient)" filter="url(#dropShadow)"
+            stroke="#22d3ee" stroke-width="2">
+            <animate attributeName="stroke-opacity" values="1;0.5;1" dur="3s" begin="1s" repeatCount="indefinite" />
+        </rect>
+
+        <text x="80" y="555" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="white">
+            LAYER 03 — EXECUTION
+        </text>
+
+        <text x="80" y="580" font-family="Arial, sans-serif" font-size="13" fill="#cffafe">
+            🌐 browser-use + Playwright + Chrome CDP
+        </text>
+
+        <!-- Execution points -->
+        <text x="100" y="605" font-family="Arial, sans-serif" font-size="11" fill="#a5f3fc">
+            AI navigates live app • Vision-based clicks • Self-healing • Live VNC stream
+        </text>
+
+        <!-- Browser activity indicator -->
+        <g transform="translate(750, 580)">
+            <rect x="-20" y="-15" width="40" height="30" rx="5" fill="none" stroke="#22d3ee" stroke-width="2">
+                <animate attributeName="stroke-opacity" values="0.5;1;0.5" dur="1s" repeatCount="indefinite" />
+            </rect>
+            <path d="M -10 -5 L -5 5 L 10 -10" stroke="#22d3ee" stroke-width="2" fill="none">
+                <animate attributeName="stroke-opacity" values="0.5;1;0.5" dur="1s" begin="0.2s"
+                    repeatCount="indefinite" />
+            </path>
+        </g>
+    </g>
+
+    <!-- Side labels -->
+    <g opacity="0.7">
+        <text x="880" y="140" font-family="Arial, sans-serif" font-size="11" fill="#60a5fa" text-anchor="end">
+            INPUT
+        </text>
+        <text x="880" y="360" font-family="Arial, sans-serif" font-size="11" fill="#a78bfa" text-anchor="end">
+            INTELLIGENCE
+        </text>
+        <text x="880" y="575" font-family="Arial, sans-serif" font-size="11" fill="#22d3ee" text-anchor="end">
+            ACTION
+        </text>
+    </g>
+</svg>

@@ -1,0 +1,193 @@
+<svg width="1000" height="250" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <linearGradient id="agentGradient1" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:0.9" />
+            <stop offset="100%" style="stop-color:#1e40af;stop-opacity:0.9" />
+        </linearGradient>
+
+        <linearGradient id="agentGradient2" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#8b5cf6;stop-opacity:0.9" />
+            <stop offset="100%" style="stop-color:#6d28d9;stop-opacity:0.9" />
+        </linearGradient>
+
+        <linearGradient id="agentGradient3" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#06b6d4;stop-opacity:0.9" />
+            <stop offset="100%" style="stop-color:#0e7490;stop-opacity:0.9" />
+        </linearGradient>
+
+        <linearGradient id="agentGradient4" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#10b981;stop-opacity:0.9" />
+            <stop offset="100%" style="stop-color:#047857;stop-opacity:0.9" />
+        </linearGradient>
+
+        <linearGradient id="agentGradient5" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#f59e0b;stop-opacity:0.9" />
+            <stop offset="100%" style="stop-color:#d97706;stop-opacity:0.9" />
+        </linearGradient>
+
+        <filter id="glow">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+            <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+            </feMerge>
+        </filter>
+    </defs>
+
+    <!-- Background -->
+    <rect width="1000" height="250" fill="#0f172a" />
+
+    <!-- Title -->
+    <text x="500" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="bold"
+        fill="#e2e8f0">
+        5-Agent Pipeline in Action
+    </text>
+
+    <!-- Agent 1 -->
+    <g>
+        <rect x="30" y="60" width="170" height="150" rx="8" fill="url(#agentGradient1)" stroke="#3b82f6"
+            stroke-width="2">
+            <animate attributeName="opacity" values="1;0.8;1" dur="10s" repeatCount="indefinite" />
+            <animate attributeName="stroke-width" values="2;3;2" dur="10s" repeatCount="indefinite" />
+        </rect>
+        <text x="115" y="95" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold"
+            fill="white">Requirement</text>
+        <text x="115" y="115" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold"
+            fill="white">Analyst</text>
+        <text x="115" y="150" text-anchor="middle" font-family="Arial, sans-serif" font-size="11"
+            fill="#dbeafe">Analyzes user</text>
+        <text x="115" y="165" text-anchor="middle" font-family="Arial, sans-serif" font-size="11"
+            fill="#dbeafe">requirements &amp;</text>
+        <text x="115" y="180" text-anchor="middle" font-family="Arial, sans-serif" font-size="11"
+            fill="#dbeafe">extracts criteria</text>
+        <circle cx="115" cy="195" r="4" fill="#3b82f6" filter="url(#glow)">
+            <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite" />
+        </circle>
+    </g>
+
+    <!-- Arrow 1-2 -->
+    <path d="M 200 135 L 220 135" stroke="#60a5fa" stroke-width="3" fill="none" />
+    <polygon points="220,135 215,130 215,140" fill="#60a5fa" />
+    <circle r="3" fill="#60a5fa" filter="url(#glow)">
+        <animateMotion dur="2s" repeatCount="indefinite" path="M 200 135 L 220 135" />
+        <animate attributeName="opacity" values="0;1;0" dur="2s" repeatCount="indefinite" />
+    </circle>
+
+    <!-- Agent 2 -->
+    <g>
+        <rect x="230" y="60" width="170" height="150" rx="8" fill="url(#agentGradient2)" stroke="#8b5cf6"
+            stroke-width="2">
+            <animate attributeName="opacity" values="0.8;1;0.8" dur="10s" begin="2s" repeatCount="indefinite" />
+            <animate attributeName="stroke-width" values="2;3;2" dur="10s" begin="2s" repeatCount="indefinite" />
+        </rect>
+        <text x="315" y="95" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold"
+            fill="white">Test Case</text>
+        <text x="315" y="115" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold"
+            fill="white">Architect</text>
+        <text x="315" y="150" text-anchor="middle" font-family="Arial, sans-serif" font-size="11"
+            fill="#ede9fe">Generates BDD</text>
+        <text x="315" y="165" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#ede9fe">test
+            cases in</text>
+        <text x="315" y="180" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#ede9fe">natural
+            language</text>
+        <circle cx="315" cy="195" r="4" fill="#8b5cf6" filter="url(#glow)">
+            <animate attributeName="opacity" values="1;0.3;1" dur="2s" begin="2s" repeatCount="indefinite" />
+        </circle>
+    </g>
+
+    <!-- Arrow 2-3 -->
+    <path d="M 400 135 L 420 135" stroke="#a78bfa" stroke-width="3" fill="none" />
+    <polygon points="420,135 415,130 415,140" fill="#a78bfa" />
+    <circle r="3" fill="#a78bfa" filter="url(#glow)">
+        <animateMotion dur="2s" begin="2s" repeatCount="indefinite" path="M 400 135 L 420 135" />
+        <animate attributeName="opacity" values="0;1;0" dur="2s" begin="2s" repeatCount="indefinite" />
+    </circle>
+
+    <!-- Agent 3 -->
+    <g>
+        <rect x="430" y="60" width="170" height="150" rx="8" fill="url(#agentGradient3)" stroke="#06b6d4"
+            stroke-width="2">
+            <animate attributeName="opacity" values="0.8;1;0.8" dur="10s" begin="4s" repeatCount="indefinite" />
+            <animate attributeName="stroke-width" values="2;3;2" dur="10s" begin="4s" repeatCount="indefinite" />
+        </rect>
+        <text x="515" y="95" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold"
+            fill="white">Browser</text>
+        <text x="515" y="115" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold"
+            fill="white">Specialist</text>
+        <text x="515" y="150" text-anchor="middle" font-family="Arial, sans-serif" font-size="11"
+            fill="#cffafe">Executes tests in</text>
+        <text x="515" y="165" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#cffafe">live
+            browser via</text>
+        <text x="515" y="180" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#cffafe">AI
+            navigation</text>
+        <circle cx="515" cy="195" r="4" fill="#06b6d4" filter="url(#glow)">
+            <animate attributeName="opacity" values="1;0.3;1" dur="2s" begin="4s" repeatCount="indefinite" />
+        </circle>
+    </g>
+
+    <!-- Arrow 3-4 -->
+    <path d="M 600 135 L 620 135" stroke="#22d3ee" stroke-width="3" fill="none" />
+    <polygon points="620,135 615,130 615,140" fill="#22d3ee" />
+    <circle r="3" fill="#22d3ee" filter="url(#glow)">
+        <animateMotion dur="2s" begin="4s" repeatCount="indefinite" path="M 600 135 L 620 135" />
+        <animate attributeName="opacity" values="0;1;0" dur="2s" begin="4s" repeatCount="indefinite" />
+    </circle>
+
+    <!-- Agent 4 -->
+    <g>
+        <rect x="630" y="60" width="170" height="150" rx="8" fill="url(#agentGradient4)" stroke="#10b981"
+            stroke-width="2">
+            <animate attributeName="opacity" values="0.8;1;0.8" dur="10s" begin="6s" repeatCount="indefinite" />
+            <animate attributeName="stroke-width" values="2;3;2" dur="10s" begin="6s" repeatCount="indefinite" />
+        </rect>
+        <text x="715" y="95" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold"
+            fill="white">Monitor</text>
+        <text x="715" y="115" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold"
+            fill="white">Validator</text>
+        <text x="715" y="150" text-anchor="middle" font-family="Arial, sans-serif" font-size="11"
+            fill="#d1fae5">Captures screens</text>
+        <text x="715" y="165" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#d1fae5">&amp;
+            validates with</text>
+        <text x="715" y="180" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#d1fae5">Vision
+            AI</text>
+        <circle cx="715" cy="195" r="4" fill="#10b981" filter="url(#glow)">
+            <animate attributeName="opacity" values="1;0.3;1" dur="2s" begin="6s" repeatCount="indefinite" />
+        </circle>
+    </g>
+
+    <!-- Arrow 4-5 -->
+    <path d="M 800 135 L 820 135" stroke="#34d399" stroke-width="3" fill="none" />
+    <polygon points="820,135 815,130 815,140" fill="#34d399" />
+    <circle r="3" fill="#34d399" filter="url(#glow)">
+        <animateMotion dur="2s" begin="6s" repeatCount="indefinite" path="M 800 135 L 820 135" />
+        <animate attributeName="opacity" values="0;1;0" dur="2s" begin="6s" repeatCount="indefinite" />
+    </circle>
+
+    <!-- Agent 5 -->
+    <g>
+        <rect x="830" y="60" width="150" height="150" rx="8" fill="url(#agentGradient5)" stroke="#f59e0b"
+            stroke-width="2">
+            <animate attributeName="opacity" values="0.8;1;0.8" dur="10s" begin="8s" repeatCount="indefinite" />
+            <animate attributeName="stroke-width" values="2;3;2" dur="10s" begin="8s" repeatCount="indefinite" />
+        </rect>
+        <text x="905" y="95" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold"
+            fill="white">Report</text>
+        <text x="905" y="115" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold"
+            fill="white">Generator</text>
+        <text x="905" y="150" text-anchor="middle" font-family="Arial, sans-serif" font-size="11"
+            fill="#fef3c7">Compiles results,</text>
+        <text x="905" y="165" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#fef3c7">quality
+            score &amp;</text>
+        <text x="905" y="180" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#fef3c7">MP4
+            recording</text>
+        <circle cx="905" cy="195" r="4" fill="#f59e0b" filter="url(#glow)">
+            <animate attributeName="opacity" values="1;0.3;1" dur="2s" begin="8s" repeatCount="indefinite" />
+        </circle>
+    </g>
+
+    <!-- Progress bar -->
+    <rect x="30" y="230" width="950" height="6" rx="3" fill="#1e293b" />
+    <rect x="30" y="230" width="0" height="6" rx="3" fill="url(#agentGradient3)">
+        <animate attributeName="width" values="0;950;0" dur="10s" repeatCount="indefinite" />
+    </rect>
+</svg>

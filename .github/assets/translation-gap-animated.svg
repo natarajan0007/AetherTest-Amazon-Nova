@@ -1,0 +1,157 @@
+<svg width="900" height="400" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <linearGradient id="oldWayGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#ef4444;stop-opacity:0.8" />
+            <stop offset="100%" style="stop-color:#dc2626;stop-opacity:0.8" />
+        </linearGradient>
+
+        <linearGradient id="newWayGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#10b981;stop-opacity:0.8" />
+            <stop offset="100%" style="stop-color:#059669;stop-opacity:0.8" />
+        </linearGradient>
+
+        <filter id="shadow">
+            <feGaussianBlur in="SourceAlpha" stdDeviation="3" />
+            <feOffset dx="2" dy="2" result="offsetblur" />
+            <feComponentTransfer>
+                <feFuncA type="linear" slope="0.3" />
+            </feComponentTransfer>
+            <feMerge>
+                <feMergeNode />
+                <feMergeNode in="SourceGraphic" />
+            </feMerge>
+        </filter>
+    </defs>
+
+    <!-- Background -->
+    <rect width="900" height="400" fill="#0f172a" />
+
+    <!-- Title -->
+    <text x="450" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold"
+        fill="#e2e8f0">
+        The Translation Gap: Before vs After
+    </text>
+
+    <!-- OLD WAY - LEFT SIDE -->
+    <text x="225" y="70" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold"
+        fill="#ef4444">
+        Traditional Testing
+    </text>
+
+    <!-- Figma Design Box -->
+    <rect x="100" y="90" width="250" height="50" rx="8" fill="url(#oldWayGradient)" filter="url(#shadow)" />
+    <text x="225" y="122" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="white">
+        📐 Figma Design + PRD
+    </text>
+
+    <!-- Arrow down with warning sign -->
+    <path d="M 225 140 L 225 180" stroke="#fbbf24" stroke-width="3" fill="none" stroke-dasharray="5,5">
+        <animate attributeName="stroke-dashoffset" from="0" to="10" dur="1s" repeatCount="indefinite" />
+    </path>
+    <polygon points="225,180 220,170 230,170" fill="#fbbf24">
+        <animate attributeName="opacity" values="1;0.5;1" dur="1s" repeatCount="indefinite" />
+    </polygon>
+
+    <!-- Manual Translation Box -->
+    <rect x="100" y="190" width="250" height="60" rx="8" fill="#7c2d12" filter="url(#shadow)" stroke="#fbbf24"
+        stroke-width="2">
+        <animate attributeName="stroke-opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite" />
+    </rect>
+    <text x="225" y="215" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#fef3c7">
+        ⚠️ Manual Translation
+    </text>
+    <text x="225" y="235" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#fbbf24">
+        (Days to Weeks)
+    </text>
+
+    <!-- Arrow down -->
+    <path d="M 225 250 L 225 280" stroke="#ef4444" stroke-width="3" fill="none" />
+    <polygon points="225,280 220,270 230,270" fill="#ef4444" />
+
+    <!-- Test Scripts Box -->
+    <rect x="100" y="290" width="250" height="50" rx="8" fill="url(#oldWayGradient)" filter="url(#shadow)" />
+    <text x="225" y="322" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="white">
+        📝 Test Scripts (Selenium)
+    </text>
+
+    <!-- Maintenance warning -->
+    <g opacity="0.9">
+        <animate attributeName="opacity" values="0.9;0.3;0.9" dur="2s" repeatCount="indefinite" />
+        <text x="225" y="370" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#fbbf24">
+            🔧 30% time on maintenance
+        </text>
+    </g>
+
+    <!-- Divider -->
+    <line x1="450" y1="60" x2="450" y2="390" stroke="#475569" stroke-width="2" stroke-dasharray="10,5" />
+
+    <!-- NEW WAY - RIGHT SIDE -->
+    <text x="675" y="70" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold"
+        fill="#10b981">
+        AetherTest
+    </text>
+
+    <!-- Plain English Input -->
+    <rect x="550" y="90" width="250" height="50" rx="8" fill="url(#newWayGradient)" filter="url(#shadow)" />
+    <text x="675" y="122" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="white">
+        💬 Plain English Requirement
+    </text>
+
+    <!-- Fast arrow down with particles -->
+    <g>
+        <path d="M 675 140 L 675 280" stroke="#10b981" stroke-width="4" fill="none">
+            <animate attributeName="stroke-width" values="4;6;4" dur="1s" repeatCount="indefinite" />
+        </path>
+        <polygon points="675,280 670,270 680,270" fill="#10b981">
+            <animate attributeName="opacity" values="1;0.7;1" dur="0.5s" repeatCount="indefinite" />
+        </polygon>
+
+        <!-- Flowing particles showing AI processing -->
+        <circle r="4" fill="#10b981" opacity="0.8">
+            <animateMotion dur="1.5s" repeatCount="indefinite" path="M 675 140 L 675 280" />
+            <animate attributeName="opacity" values="0;0.8;0" dur="1.5s" repeatCount="indefinite" />
+        </circle>
+
+        <circle r="3" fill="#34d399" opacity="0.8">
+            <animateMotion dur="1.5s" begin="0.3s" repeatCount="indefinite" path="M 675 140 L 675 280" />
+            <animate attributeName="opacity" values="0;0.8;0" dur="1.5s" begin="0.3s" repeatCount="indefinite" />
+        </circle>
+
+        <circle r="3" fill="#6ee7b7" opacity="0.8">
+            <animateMotion dur="1.5s" begin="0.6s" repeatCount="indefinite" path="M 675 140 L 675 280" />
+            <animate attributeName="opacity" values="0;0.8;0" dur="1.5s" begin="0.6s" repeatCount="indefinite" />
+        </circle>
+    </g>
+
+    <!-- AI Processing Labels -->
+    <text x="720" y="170" font-family="Arial, sans-serif" font-size="10" fill="#10b981" opacity="0.8">
+        🤖 AI Analysis
+        <animate attributeName="opacity" values="0.8;0.3;0.8" dur="2s" repeatCount="indefinite" />
+    </text>
+    <text x="720" y="200" font-family="Arial, sans-serif" font-size="10" fill="#10b981" opacity="0.8">
+        ✨ Auto Test Gen
+        <animate attributeName="opacity" values="0.8;0.3;0.8" dur="2s" begin="0.5s" repeatCount="indefinite" />
+    </text>
+    <text x="720" y="230" font-family="Arial, sans-serif" font-size="10" fill="#10b981" opacity="0.8">
+        🔍 Vision Validation
+        <animate attributeName="opacity" values="0.8;0.3;0.8" dur="2s" begin="1s" repeatCount="indefinite" />
+    </text>
+
+    <!-- Quality Report Box -->
+    <rect x="550" y="290" width="250" height="50" rx="8" fill="url(#newWayGradient)" filter="url(#shadow)">
+        <animate attributeName="opacity" values="1;0.9;1" dur="2s" repeatCount="indefinite" />
+    </rect>
+    <text x="675" y="322" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" fill="white">
+        📊 Quality Report + Tests
+    </text>
+
+    <!-- Time savings -->
+    <g opacity="0.9">
+        <animate attributeName="opacity" values="0.9;1;0.9" dur="1.5s" repeatCount="indefinite" />
+        <rect x="590" y="355" width="170" height="25" rx="12" fill="#065f46" />
+        <text x="675" y="373" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#6ee7b7"
+            font-weight="bold">
+            ⚡ Seconds, not days
+        </text>
+    </g>
+</svg>

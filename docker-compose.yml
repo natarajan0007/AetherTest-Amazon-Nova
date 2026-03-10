@@ -1,0 +1,65 @@
+version: "3.9"
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8001
+      - NEXT_PUBLIC_WS_URL=ws://localhost:8001
+      - NEXT_PUBLIC_NOVNC_URL=http://localhost:6080
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8001:8001"
+    env_file:
+      - .env
+    environment:
+      - BROWSER_SANDBOX_CDP=http://browser-sandbox:9222
+      - NOVNC_URL=http://browser-sandbox:6080
+      - DATABASE_URL=sqlite:///./data/aethertest.db
+      - LOCAL_STORAGE_PATH=/local-storage
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+    volumes:
+      - ./backend:/app
+      - ./backend/local-storage:/local-storage
+      - backend-data:/app/data
+    depends_on:
+      - browser-sandbox
+
+  browser-sandbox:
+    build:
+      context: .
+      dockerfile: sandbox/Dockerfile
+    ports:
+      - "6080:6080"
+      - "5900:5900"
+      - "9222:9222"
+      - "8888:8888"
+    environment:
+      - DISPLAY=:99
+      - SCREEN_WIDTH=1280
+      - SCREEN_HEIGHT=800
+      - SCREEN_DEPTH=24
+    volumes:
+      - ./backend/local-storage:/local-storage
+    shm_size: "2gb"
+
+volumes:
+  backend-data:
+    driver: local
