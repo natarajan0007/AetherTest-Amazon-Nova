@@ -3,6 +3,7 @@ import json
 import logging
 import asyncio
 from typing import Optional, Any
+from datetime import datetime
 
 import boto3
 from botocore.config import Config
@@ -14,6 +15,7 @@ from ..services.storage_service import StorageService
 from ..models.session import SessionUpdate
 from ..tools import vision_tools, browser_tools, storage_tools
 from ..services.recording_service import RecordingService
+from ..memory.service import get_memory_service
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -23,6 +25,13 @@ settings = get_settings()
 ROOT_ORCHESTRATOR_PROMPT = """You are AetherTest, an autonomous Software Testing Life Cycle (STLC) engine.
 Transform a natural-language requirement into fully executed, validated test cases.
 Be concise in text responses — prefer tool calls over lengthy explanations.
+
+## Memory & Learning
+You have an always-on memory layer that stores learnings from past test sessions.
+If relevant memories are provided in the user prompt, use them to:
+- Avoid repeating past mistakes
+- Apply successful patterns from similar tests
+- Improve test case generation based on historical insights
 
 ## Your workflow — follow these phases IN ORDER:
 
@@ -136,11 +145,134 @@ class AetherTestOrchestrator:
         self.session_svc = session_svc
         self.storage_svc = StorageService()
         self.recording_svc = RecordingService()
+        self.memory_svc = get_memory_service()  # Always-on memory layer
         # Holds the most-recently captured screenshot so analyze_screenshot
         # can auto-inject it when Claude forgets to pass screenshot_b64.
         self._last_screenshot: str = ""
         # Track if complete message was already sent (to avoid duplicates)
         self._complete_sent: bool = False
+        # Track test results for memory storage
+        self._test_results: list[dict] = []
+        self._test_cases: list[dict] = []
+        self._current_requirement: str = ""
+        self._current_target_url: str = ""
+
+    # ── Memory Integration Methods ────────────────────────────────────────────
+
+    async def _recall_relevant_memories(self, requirement: str, target_url: str) -> str:
+        """Query memory for relevant past test sessions to inform current execution."""
+        sid = "[memory]"
+        try:
+            # Search for memories related to this URL or similar requirements
+            url_memories = self.memory_svc.search_memories(target_url, limit=5)
+            req_memories = self.memory_svc.search_memories(requirement[:100], limit=5)
+            
+            # Combine and deduplicate
+            seen_ids = set()
+            relevant = []
+            for m in url_memories + req_memories:
+                if m.id not in seen_ids:
+                    seen_ids.add(m.id)
+                    relevant.append(m)
+            
+            if not relevant:
+                logger.info(f"{sid} No relevant memories found")
+                return ""
+            
+            # Format memories for context injection
+            memory_context = "\n\n## LEARNINGS FROM PAST TEST SESSIONS:\n"
+            for m in relevant[:5]:  # Limit to top 5
+                memory_context += f"\n### Memory (importance: {m.importance:.1f}):\n"
+                memory_context += f"- Summary: {m.summary}\n"
+                if m.entities:
+                    memory_context += f"- Entities: {', '.join(m.entities)}\n"
+                if m.topics:
+                    memory_context += f"- Topics: {', '.join(m.topics)}\n"
+            
+            memory_context += "\nUse these learnings to improve test generation and execution.\n"
+            logger.info(f"{sid} Recalled {len(relevant)} relevant memories")
+            return memory_context
+            
+        except Exception as e:
+            logger.warning(f"{sid} Failed to recall memories: {e}")
+            return ""
+
+    async def _store_session_memory(
+        self,
+        session_id: str,
+        requirement: str,
+        target_url: str,
+        test_cases: list[dict],
+        test_results: list[dict],
+        quality_score: float,
+    ) -> None:
+        """Store the test session in memory for future learning."""
+        sid = _sid(session_id)
+        try:
+            # Calculate pass/fail stats
+            passed = sum(1 for r in test_results if r.get("verdict") == "PASS")
+            failed = sum(1 for r in test_results if r.get("verdict") == "FAIL")
+            total = len(test_results) if test_results else len(test_cases)
+            
+            # Extract key learnings from failures
+            failure_learnings = []
+            for r in test_results:
+                if r.get("verdict") == "FAIL":
+                    failure_learnings.append(f"- {r.get('test_id', 'Unknown')}: {r.get('explanation', 'No details')[:100]}")
+            
+            # Build memory content
+            raw_text = f"""Test Session for: {target_url}
+Requirement: {requirement}
+Results: {passed}/{total} passed ({quality_score:.0f}% quality)
+Test Cases Generated: {len(test_cases)}
+"""
+            if failure_learnings:
+                raw_text += f"\nFailure Learnings:\n" + "\n".join(failure_learnings[:5])
+            
+            # Generate summary
+            summary = f"Tested '{requirement[:50]}...' on {target_url}. {passed}/{total} passed. "
+            if failure_learnings:
+                summary += f"Key issues: {failure_learnings[0][:50]}..."
+            else:
+                summary += "All tests passed successfully."
+            
+            # Extract entities (URL domain, key terms from requirement)
+            from urllib.parse import urlparse
+            domain = urlparse(target_url).netloc if target_url else ""
+            entities = [domain] if domain else []
+            
+            # Extract topics from requirement
+            topics = ["testing", "automation"]
+            if "login" in requirement.lower():
+                topics.append("authentication")
+            if "search" in requirement.lower():
+                topics.append("search")
+            if "form" in requirement.lower():
+                topics.append("forms")
+            if "api" in requirement.lower():
+                topics.append("api")
+            
+            # Calculate importance based on results
+            importance = 0.5
+            if failed > 0:
+                importance = 0.8  # Failures are more important to remember
+            if quality_score < 50:
+                importance = 0.9  # Low quality sessions are critical learnings
+            
+            # Store in memory
+            result = self.memory_svc.store_memory(
+                raw_text=raw_text,
+                summary=summary,
+                entities=entities,
+                topics=topics,
+                importance=importance,
+                source=f"session:{session_id[:8]}",
+            )
+            
+            logger.info(f"{sid} Stored session in memory (id={result.get('memory_id')}, importance={importance})")
+            
+        except Exception as e:
+            logger.warning(f"{sid} Failed to store session memory: {e}")
 
     # ── Public entry point ────────────────────────────────────────────────────
 
@@ -165,6 +297,10 @@ class AetherTestOrchestrator:
         # Reset state for this pipeline run
         self._complete_sent = False
         self._last_screenshot = ""
+        self._test_results = []
+        self._test_cases = []
+        self._current_requirement = requirement
+        self._current_target_url = target_url
 
         # ── Start screen recording ─────────────────────────────────────────────
         rec_result = await self.recording_svc.start(session_id)
@@ -258,12 +394,20 @@ class AetherTestOrchestrator:
             
             bedrock_client = boto_session.client('bedrock-runtime', **client_kwargs)
 
+            # ── Recall relevant memories from past sessions ────────────────────
+            await self.ws.send_agent_update(session_id, "orchestrator", "working", "🧠 Recalling past learnings…")
+            memory_context = await self._recall_relevant_memories(requirement, target_url)
+            if memory_context:
+                logger.info(f"{sid} Memory context injected into prompt")
+                await self.ws.send_agent_update(session_id, "orchestrator", "working", "📚 Found relevant past experiences")
+
             cred_hint = f"\nStored credential name to use: {credential_name}" if credential_name else ""
             user_prompt = (
                 f"Execute the full AetherTest STLC pipeline.\n\n"
                 f"Requirement: {requirement}\n"
                 f"Target URL: {target_url}{cred_hint}\n"
-                f"Test case count: generate exactly {test_case_count} BDD test cases in Phase 2.\n\n"
+                f"Test case count: generate exactly {test_case_count} BDD test cases in Phase 2.\n"
+                f"{memory_context}\n"
                 f"Begin Phase 1 now."
             )
 
@@ -401,6 +545,9 @@ class AetherTestOrchestrator:
             cases = tool_input.get("test_cases", [])
             logger.info(f"{sid} [test-case-architect] registering {len(cases)} test cases")
             
+            # Track test cases for memory storage
+            self._test_cases = cases
+            
             # Mark requirement-analyst as done (Phase 1 complete)
             await self.ws.send_agent_update(
                 session_id, "requirement-analyst", "done",
@@ -494,6 +641,15 @@ class AetherTestOrchestrator:
             source  = inner.get("source", "vision")
             test_id = tool_input.get("test_id", "current")
             logger.info(f"{sid} [monitor-validator] verdict={verdict} [{test_id}] via {source}: {explain[:100]}")
+            
+            # Track test result for memory storage
+            self._test_results.append({
+                "test_id": test_id,
+                "verdict": verdict,
+                "explanation": explain,
+                "source": source,
+            })
+            
             await self.ws.send_monitor_result(session_id, test_id, verdict, explain)
             await self.ws.send_agent_update(
                 session_id, "monitor-validator", "done",
@@ -568,6 +724,21 @@ class AetherTestOrchestrator:
                 )
                 await self.session_svc.update_session(
                     session_id, SessionUpdate(status="completed", report_id=rep_id)
+                )
+                
+                # ── Store session in memory for future learning ────────────────
+                # Use tracked requirement and URL from pipeline start
+                await self._store_session_memory(
+                    session_id=session_id,
+                    requirement=getattr(self, '_current_requirement', req) or req,
+                    target_url=getattr(self, '_current_target_url', url) or url,
+                    test_cases=self._test_cases,
+                    test_results=self._test_results,
+                    quality_score=quality,
+                )
+                await self.ws.send_agent_update(
+                    session_id, "orchestrator", "done",
+                    "🧠 Session stored in memory for future learning"
                 )
             else:
                 logger.warning(f"{sid} [report-generator] no report_id returned")
