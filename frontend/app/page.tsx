@@ -90,24 +90,18 @@ function HeroSection({ onLaunch }: { onLaunch: () => void }) {
 
   return (
     <section className="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 pt-16 pb-20 text-center">
-      {/* Navigation Bar */}
+      {/* Navigation Bar - Right side only */}
       <motion.nav
         initial={{ y: -50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 bg-slate-950/80 backdrop-blur-lg border-b border-slate-800/50"
+        className="fixed top-0 right-0 z-50 flex items-center gap-4 px-6 py-4"
       >
-        <Link href="/" className="flex items-center gap-2 text-white font-bold">
-          <span className="text-2xl">✨</span>
-          <span>AetherTest</span>
+        <Link href="/launch" className="px-3 py-1.5 text-slate-400 hover:text-white transition-colors text-sm rounded-lg hover:bg-slate-800/50">
+          Launch Test
         </Link>
-        <div className="flex items-center gap-4">
-          <Link href="/launch" className="text-slate-400 hover:text-white transition-colors text-sm">
-            Launch Test
-          </Link>
-          <Link href="/memory" className="flex items-center gap-1 text-slate-400 hover:text-purple-400 transition-colors text-sm">
-            <span>🧠</span> Memory
-          </Link>
-        </div>
+        <Link href="/memory" className="flex items-center gap-1.5 px-3 py-1.5 text-slate-400 hover:text-purple-400 transition-colors text-sm rounded-lg hover:bg-purple-900/20 border border-transparent hover:border-purple-500/30">
+          <span>🧠</span> Memory
+        </Link>
       </motion.nav>
       {/* Pulsing logo */}
       <motion.div
