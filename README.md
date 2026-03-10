@@ -267,11 +267,20 @@ AetherTest/
 │   │   ├── agents/
 │   │   │   ├── orchestrator.py         # Bedrock Converse loop
 │   │   │   └── strands_orchestrator.py # Strands SDK mode
+│   │   ├── memory/                     # Always-On Memory Layer
+│   │   │   ├── models.py               # Memory dataclasses
+│   │   │   ├── service.py              # Unified MemoryService
+│   │   │   ├── local_store.py          # SQLite store (dev)
+│   │   │   └── agentcore_store.py      # AWS AgentCore (prod)
 │   │   ├── tools/
 │   │   │   ├── browser_tools.py        # CDP + browser-use
 │   │   │   ├── vision_tools.py         # Claude Haiku vision
 │   │   │   └── storage_tools.py        # Reports + credentials
-│   │   └── api/                        # REST endpoints
+│   │   └── api/
+│   │       ├── sessions.py             # Session management
+│   │       ├── credentials.py          # Encrypted credentials
+│   │       ├── recording.py            # Screen recording
+│   │       └── memory.py               # Memory Layer API
 │   └── requirements.txt
 │
 ├── frontend/
@@ -286,6 +295,40 @@ AetherTest/
     ├── start.sh                # Service startup
     └── recorder.py             # FFmpeg API
 ```
+
+---
+
+## Memory Layer (Always-On)
+
+AetherTest includes an always-on memory layer for learning from past test sessions:
+
+### Features
+- **Memory Storage**: Store structured memories with entities, topics, importance
+- **Semantic Search**: Search memories by text content
+- **Consolidation**: Automatically find patterns across memories
+- **Flexible Backend**: SQLite (dev) or AWS AgentCore Memory (prod)
+
+### Configuration
+```bash
+# Local development
+MEMORY_STORE_TYPE=local
+MEMORY_DB_PATH=./data/memory.db
+
+# Production (AWS AgentCore)
+MEMORY_STORE_TYPE=agentcore
+AGENTCORE_MEMORY_ID=your-memory-id
+AGENTCORE_MEMORY_REGION=us-west-2
+```
+
+### API Endpoints
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/memory/status` | Memory statistics |
+| `GET` | `/api/memory/memories` | List all memories |
+| `POST` | `/api/memory/ingest` | Ingest text |
+| `GET` | `/api/memory/search?q=` | Search memories |
+| `POST` | `/api/memory/query` | Query memories |
+| `POST` | `/api/memory/consolidate` | Consolidate memories |
 
 ---
 

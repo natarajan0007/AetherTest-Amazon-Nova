@@ -11,7 +11,7 @@ import os
 from .config import get_settings
 from .database import init_db
 from .websocket.manager import ws_manager
-from .api import sessions, credentials, recording
+from .api import sessions, credentials, recording, memory
 
 logging.basicConfig(
     level=logging.INFO,
@@ -61,6 +61,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(sessions.router)
 app.include_router(credentials.router)
 app.include_router(recording.router)
+app.include_router(memory.router)
 
 # Serve local storage files (screenshots, reports, recordings)
 storage_path = settings.local_storage_path

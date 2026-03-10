@@ -40,6 +40,15 @@ class Settings(BaseSettings):
     # Agents
     max_turns: int = 100
     log_level: str = "INFO"
+    use_strands: bool = False
+
+    # Memory Layer Configuration
+    # "local" = SQLite (development), "agentcore" = AWS Bedrock AgentCore Memory (production)
+    memory_store_type: str = "local"
+    memory_db_path: str = "./data/memory.db"
+    # AWS AgentCore Memory settings (for production deployment)
+    agentcore_memory_id: str = ""
+    agentcore_memory_region: str = "us-west-2"
 
     model_config = {"env_file": (".env", "../.env"), "extra": "ignore"}
 
