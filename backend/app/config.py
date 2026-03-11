@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     agentcore_memory_id: str = ""
     agentcore_memory_region: str = "us-west-2"
 
+    # PageAgent Integration
+    # When enabled, uses PageAgent's indexed DOM extraction for more reliable element interactions
+    pageagent_enabled: bool = True
+
     model_config = {"env_file": (".env", "../.env"), "extra": "ignore"}
 
 

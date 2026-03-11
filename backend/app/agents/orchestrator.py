@@ -13,7 +13,7 @@ from ..websocket.manager import WebSocketManager
 from ..services.session_service import SessionService
 from ..services.storage_service import StorageService
 from ..models.session import SessionUpdate
-from ..tools import vision_tools, browser_tools, storage_tools
+from ..tools import vision_tools, browser_tools, storage_tools, pageagent_bridge
 from ..services.recording_service import RecordingService
 from ..memory.service import get_memory_service
 
@@ -33,6 +33,24 @@ If relevant memories are provided in the user prompt, use them to:
 - Apply successful patterns from similar tests
 - Improve test case generation based on historical insights
 
+## Page Interaction (PageAgent)
+The page state shows interactive elements with index numbers:
+```
+[0]<button>Login</button>
+[1]<input placeholder='Email'>
+[2]<input type='password' placeholder='Password'>
+[3]<a href='/signup'>Sign up</a>
+```
+
+To interact with elements:
+- First call `get_page_state` to see all interactive elements with their indices
+- Use `click_element` with the index: click_element(index=0) clicks the Login button
+- Use `input_text` with index and text: input_text(index=1, text="user@example.com")
+- Use `select_option` for dropdowns: select_option(index=5, option_text="United States")
+- Use `scroll_page` if content is below/above the viewport
+
+IMPORTANT: Always call `get_page_state` after navigation or major actions to see updated elements.
+
 ## Your workflow — follow these phases IN ORDER:
 
 ### Phase 1 — Requirement Analysis
@@ -51,18 +69,19 @@ Cover: happy path, negative cases, and edge cases proportionally.
 Each needs: id (TC-001, TC-002, TC-003 format), title, description, steps ([{action, expected}]).
 
 ### Phase 3+4 — Execution + Validation (INTERLEAVED per test case)
-For EACH test case, perform these 3 steps IN ORDER before moving to the next test case:
+For EACH test case, perform these steps IN ORDER before moving to the next test case:
 
-  STEP A — execute_browser_task: run the browser actions for this test case.
-  STEP B — capture_screenshot: call immediately after execution.
-             Returns {"status": "captured"} — the image is handled automatically.
-  STEP C — analyze_screenshot: call with TWO arguments:
+  STEP A — Navigate: Use execute_browser_task to navigate to the target URL if needed.
+  STEP B — Get State: Call get_page_state to see all interactive elements.
+  STEP C — Interact: Use click_element, input_text, select_option based on test steps.
+           After each interaction, call get_page_state again to see updated elements.
+  STEP D — Screenshot: Call capture_screenshot after completing the test actions.
+  STEP E — Validate: Call analyze_screenshot with:
              • expected_state = what the page should show for this test case to PASS
              • test_id = the TC-00N id of the test case (e.g. "TC-001")
-             Do NOT pass screenshot_b64 — the system injects it automatically from STEP B.
+             Do NOT pass screenshot_b64 — the system injects it automatically.
 
-Important: Do NOT batch all executions then all screenshots. Execute → Screenshot → Analyze
-for test case 1, then repeat for test case 2, etc.
+Important: Complete all steps for test case 1, then repeat for test case 2, etc.
 
 ### Phase 5 — Report
 Call save_report with a detailed report_data object containing:
@@ -78,7 +97,8 @@ Call save_report with a detailed report_data object containing:
 
 ## Rules
 - Always call register_test_cases ONCE with ALL test cases in a single array.
-- execute_browser_task instructions must be specific (URLs, field names, button text, values).
+- Use get_page_state before interacting with elements to get current indices.
+- Use click_element, input_text, select_option with indices from get_page_state.
 - If credentials are needed, call get_credentials first.
 - Do NOT pass screenshot_b64 to analyze_screenshot — the system handles it automatically.
 - Always pass test_id to analyze_screenshot (e.g. "TC-001") so the UI updates correctly.
@@ -132,6 +152,15 @@ ALL_TOOLS = [
     vision_tools.get_vision_tool_definition(),
     storage_tools.get_credential_tool_definition(),
     storage_tools.get_save_report_tool_definition(),
+]
+
+# PageAgent tools for indexed element interactions
+PAGEAGENT_TOOLS = [
+    pageagent_bridge.get_page_state_tool_definition(),
+    pageagent_bridge.get_click_element_tool_definition(),
+    pageagent_bridge.get_input_text_tool_definition(),
+    pageagent_bridge.get_select_option_tool_definition(),
+    pageagent_bridge.get_scroll_page_tool_definition(),
 ]
 
 
@@ -500,7 +529,13 @@ Test Results Collected: {len(self._test_results)}
                         )
 
                 # Convert tools to Bedrock format
-                bedrock_tools = self._convert_tools_to_bedrock_format(ALL_TOOLS)
+                # Include PageAgent tools if enabled
+                tools_to_use = ALL_TOOLS.copy()
+                if settings.pageagent_enabled:
+                    tools_to_use.extend(PAGEAGENT_TOOLS)
+                    logger.info(f"{sid} PageAgent tools enabled — {len(PAGEAGENT_TOOLS)} additional tools")
+                
+                bedrock_tools = self._convert_tools_to_bedrock_format(tools_to_use)
                 
                 # Call Bedrock Converse API with Nova Pro (Claude has explicit deny in IAM)
                 # Nova Pro max tokens: 10,000
@@ -796,6 +831,92 @@ Test Results Collected: {len(self._test_results)}
                 )
             else:
                 logger.warning(f"{sid} [report-generator] no report_id returned")
+            return result.get("content", "{}")
+
+        # ── PageAgent Tools ───────────────────────────────────────────────────
+        elif tool_name == "get_page_state":
+            logger.info(f"{sid} [browser-specialist] get_page_state")
+            await self.ws.send_agent_update(session_id, "browser-specialist", "working", "Getting page state with indexed elements…")
+            result = await pageagent_bridge.handle_get_page_state(tool_input)
+            inner = json.loads(result.get("content", "{}"))
+            if inner.get("success"):
+                elem_count = inner.get("elementCount", 0)
+                logger.info(f"{sid} [browser-specialist] page state: {elem_count} elements indexed")
+                await self.ws.send_agent_update(session_id, "browser-specialist", "done", f"Found {elem_count} interactive elements")
+                # Return formatted state for LLM
+                content = inner.get("content", "")
+                header = inner.get("header", "")
+                footer = inner.get("footer", "")
+                return json.dumps({"page_state": f"{header}\n\n{content}\n\n{footer}"})
+            else:
+                error = inner.get("error", "Unknown error")
+                logger.warning(f"{sid} [browser-specialist] get_page_state failed: {error}")
+                return json.dumps({"error": error})
+
+        elif tool_name == "click_element":
+            index = tool_input.get("index", 0)
+            logger.info(f"{sid} [browser-specialist] click_element index={index}")
+            await self.ws.send_agent_update(session_id, "browser-specialist", "working", f"Clicking element [{index}]…")
+            await self.ws.send_browser_action(session_id, f"▶ Click element [{index}]")
+            result = await pageagent_bridge.handle_click_element(tool_input)
+            inner = json.loads(result.get("content", "{}"))
+            msg = inner.get("message", "Done")
+            if inner.get("success"):
+                await self.ws.send_browser_action(session_id, f"✓ {msg}")
+                await self.ws.send_agent_update(session_id, "browser-specialist", "done", msg)
+            else:
+                await self.ws.send_browser_action(session_id, f"✗ {msg}")
+                await self.ws.send_agent_update(session_id, "browser-specialist", "done", f"Failed: {msg}")
+            return result.get("content", "{}")
+
+        elif tool_name == "input_text":
+            index = tool_input.get("index", 0)
+            text = tool_input.get("text", "")
+            logger.info(f"{sid} [browser-specialist] input_text index={index} text={text[:30]}...")
+            await self.ws.send_agent_update(session_id, "browser-specialist", "working", f"Typing into element [{index}]…")
+            await self.ws.send_browser_action(session_id, f"▶ Input '{text[:20]}...' into [{index}]")
+            result = await pageagent_bridge.handle_input_text(tool_input)
+            inner = json.loads(result.get("content", "{}"))
+            msg = inner.get("message", "Done")
+            if inner.get("success"):
+                await self.ws.send_browser_action(session_id, f"✓ {msg}")
+                await self.ws.send_agent_update(session_id, "browser-specialist", "done", msg)
+            else:
+                await self.ws.send_browser_action(session_id, f"✗ {msg}")
+                await self.ws.send_agent_update(session_id, "browser-specialist", "done", f"Failed: {msg}")
+            return result.get("content", "{}")
+
+        elif tool_name == "select_option":
+            index = tool_input.get("index", 0)
+            option_text = tool_input.get("option_text", "")
+            logger.info(f"{sid} [browser-specialist] select_option index={index} option={option_text}")
+            await self.ws.send_agent_update(session_id, "browser-specialist", "working", f"Selecting '{option_text}' in [{index}]…")
+            await self.ws.send_browser_action(session_id, f"▶ Select '{option_text}' in [{index}]")
+            result = await pageagent_bridge.handle_select_option(tool_input)
+            inner = json.loads(result.get("content", "{}"))
+            msg = inner.get("message", "Done")
+            if inner.get("success"):
+                await self.ws.send_browser_action(session_id, f"✓ {msg}")
+                await self.ws.send_agent_update(session_id, "browser-specialist", "done", msg)
+            else:
+                await self.ws.send_browser_action(session_id, f"✗ {msg}")
+                await self.ws.send_agent_update(session_id, "browser-specialist", "done", f"Failed: {msg}")
+            return result.get("content", "{}")
+
+        elif tool_name == "scroll_page":
+            direction = tool_input.get("direction", "down")
+            amount = tool_input.get("amount", 500)
+            logger.info(f"{sid} [browser-specialist] scroll_page direction={direction} amount={amount}")
+            await self.ws.send_agent_update(session_id, "browser-specialist", "working", f"Scrolling {direction}…")
+            await self.ws.send_browser_action(session_id, f"▶ Scroll {direction} {amount}px")
+            result = await pageagent_bridge.handle_scroll_page(tool_input)
+            inner = json.loads(result.get("content", "{}"))
+            msg = inner.get("message", "Done")
+            if inner.get("success"):
+                await self.ws.send_browser_action(session_id, f"✓ {msg}")
+                await self.ws.send_agent_update(session_id, "browser-specialist", "done", msg)
+            else:
+                await self.ws.send_browser_action(session_id, f"✗ {msg}")
             return result.get("content", "{}")
 
         else:
