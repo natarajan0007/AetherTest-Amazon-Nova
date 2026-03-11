@@ -283,30 +283,61 @@ PAGEAGENT_INJECTION_SCRIPT = """
             el.focus();
             await waitFor(100);
             
-            // Clear existing value
-            if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-                el.value = '';
-                el.dispatchEvent(new Event('input', { bubbles: true }));
+            // Use native value setter for better React/Vue compatibility
+            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+                window.HTMLInputElement.prototype, 'value'
+            )?.set;
+            const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(
+                window.HTMLTextAreaElement.prototype, 'value'
+            )?.set;
+            
+            // Clear existing value first
+            if (el instanceof HTMLInputElement && nativeInputValueSetter) {
+                nativeInputValueSetter.call(el, '');
+            } else if (el instanceof HTMLTextAreaElement && nativeTextAreaValueSetter) {
+                nativeTextAreaValueSetter.call(el, '');
             } else if (el.isContentEditable) {
                 el.innerText = '';
+            } else {
+                el.value = '';
             }
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            await waitFor(50);
             
-            // Set new value
-            if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-                el.value = text;
+            // Set new value using native setter
+            if (el instanceof HTMLInputElement && nativeInputValueSetter) {
+                nativeInputValueSetter.call(el, text);
+            } else if (el instanceof HTMLTextAreaElement && nativeTextAreaValueSetter) {
+                nativeTextAreaValueSetter.call(el, text);
             } else if (el.isContentEditable) {
                 el.innerText = text;
+            } else {
+                el.value = text;
             }
             
-            // Dispatch events
+            // Dispatch events to trigger React/Vue state updates
             el.dispatchEvent(new Event('input', { bubbles: true }));
             el.dispatchEvent(new Event('change', { bubbles: true }));
             
+            // Also dispatch keyboard events for better compatibility
+            el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
+            el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+            
             await waitFor(100);
+            
+            // Verify the value was set correctly
+            const actualValue = el.value || el.innerText || '';
+            if (actualValue !== text) {
+                return { 
+                    success: false, 
+                    message: `Input verification failed: expected "${text}" but got "${actualValue}"`,
+                    needs_vision_fallback: true
+                };
+            }
             
             return { success: true, message: `Input "${text}" into element [${index}]` };
         } catch (e) {
-            return { success: false, message: `Failed to input: ${e.message}` };
+            return { success: false, message: `Failed to input: ${e.message}`, needs_vision_fallback: true };
         }
     }
     

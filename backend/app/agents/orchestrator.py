@@ -104,6 +104,15 @@ Call save_report with a detailed report_data object containing:
 - Always pass test_id to analyze_screenshot (e.g. "TC-001") so the UI updates correctly.
 - Complete ALL phases before finishing.
 
+## Automatic Retry on Failure
+If a test case FAILS after using PageAgent tools (click_element, input_text, etc.):
+1. The analyze_screenshot response will include "can_retry_with_vision": true
+2. You SHOULD retry that test case using execute_browser_task with natural language instructions
+3. Example: If login failed with PageAgent, retry with:
+   execute_browser_task(task="Click the username field, type 'standard_user', click password field, type 'secret_sauce', click Login button", target_url="https://saucedemo.com")
+4. After vision retry, capture_screenshot and analyze_screenshot again
+5. Report the final result (PASS if vision retry succeeded, FAIL if both methods failed)
+
 ## User messages during execution
 If the user sends a message mid-run, check if it is:
 - A QUESTION (ends with ?) → answer it concisely based on what you have done so far, then continue.
@@ -737,6 +746,7 @@ Test Results Collected: {len(self._test_results)}
                 "verdict": verdict,
                 "explanation": explain,
                 "source": source,
+                "method": tool_input.get("execution_method", "pageagent"),  # Track which method was used
             })
             
             await self.ws.send_monitor_result(session_id, test_id, verdict, explain)
@@ -744,6 +754,20 @@ Test Results Collected: {len(self._test_results)}
                 session_id, "monitor-validator", "done",
                 f"{verdict} [{source}]: {explain[:120]}"
             )
+            
+            # ── AUTO-RETRY WITH VISION IF PAGEAGENT TEST FAILED ────────────────
+            # If test failed and was executed with PageAgent, suggest vision retry
+            execution_method = tool_input.get("execution_method", "pageagent")
+            if verdict == "FAIL" and execution_method == "pageagent" and settings.pageagent_enabled:
+                logger.info(f"{sid} [monitor-validator] Test {test_id} FAILED with PageAgent — vision retry available")
+                return json.dumps({
+                    "verdict": verdict,
+                    "explanation": explain,
+                    "source": source,
+                    "retry_hint": f"Test {test_id} failed using PageAgent. Consider retrying with execute_browser_task for vision-based execution which may handle this scenario better.",
+                    "can_retry_with_vision": True
+                })
+            
             return result.get("content", "{}")
 
         elif tool_name == "get_credentials":
@@ -905,17 +929,20 @@ Test Results Collected: {len(self._test_results)}
             inner = json.loads(result.get("content", "{}"))
             msg = inner.get("message", "Done")
             
-            if inner.get("success"):
+            # Check for success AND verify no input verification failure
+            if inner.get("success") and not inner.get("needs_vision_fallback"):
                 await self.ws.send_browser_action(session_id, f"✓ {msg}")
                 await self.ws.send_agent_update(session_id, "browser-specialist", "done", msg)
                 return result.get("content", "{}")
             else:
                 # ── FALLBACK TO VISION ────────────────────────────────────────
-                logger.warning(f"{sid} [browser-specialist] PageAgent input failed, falling back to vision…")
-                await self.ws.send_browser_action(session_id, f"⚠ PageAgent failed, trying vision fallback…")
+                # Trigger fallback if: action failed OR input verification failed
+                reason = "input verification failed" if inner.get("needs_vision_fallback") else "action failed"
+                logger.warning(f"{sid} [browser-specialist] PageAgent input {reason}, falling back to vision…")
+                await self.ws.send_browser_action(session_id, f"⚠ PageAgent {reason}, trying vision fallback…")
                 await self.ws.send_agent_update(session_id, "browser-specialist", "working", "🔄 Retrying with vision-based input…")
                 
-                fallback_task = f"Type '{text}' into the {element_desc}"
+                fallback_task = f"Click on the {element_desc}, clear any existing text, and type exactly: {text}"
                 fallback_result = await self._run_with_heartbeat(
                     session_id, "browser-specialist", f"🔍 Vision fallback: typing text…",
                     browser_tools.execute_browser_task_impl(fallback_task, self._current_target_url)
