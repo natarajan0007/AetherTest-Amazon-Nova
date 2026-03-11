@@ -833,7 +833,8 @@ Test Results Collected: {len(self._test_results)}
                 logger.warning(f"{sid} [report-generator] no report_id returned")
             return result.get("content", "{}")
 
-        # ── PageAgent Tools ───────────────────────────────────────────────────
+
+        # ── PageAgent Tools (with Vision Fallback) ────────────────────────────
         elif tool_name == "get_page_state":
             logger.info(f"{sid} [browser-specialist] get_page_state")
             await self.ws.send_agent_update(session_id, "browser-specialist", "working", "Getting page state with indexed elements…")
@@ -851,57 +852,119 @@ Test Results Collected: {len(self._test_results)}
             else:
                 error = inner.get("error", "Unknown error")
                 logger.warning(f"{sid} [browser-specialist] get_page_state failed: {error}")
-                return json.dumps({"error": error})
+                # Fallback: suggest using execute_browser_task for vision-based interaction
+                return json.dumps({
+                    "error": error,
+                    "fallback_hint": "PageAgent failed to extract page state. Use execute_browser_task with natural language instructions for vision-based interaction."
+                })
 
         elif tool_name == "click_element":
             index = tool_input.get("index", 0)
+            element_desc = tool_input.get("element_description", f"element at index {index}")
             logger.info(f"{sid} [browser-specialist] click_element index={index}")
             await self.ws.send_agent_update(session_id, "browser-specialist", "working", f"Clicking element [{index}]…")
             await self.ws.send_browser_action(session_id, f"▶ Click element [{index}]")
             result = await pageagent_bridge.handle_click_element(tool_input)
             inner = json.loads(result.get("content", "{}"))
             msg = inner.get("message", "Done")
+            
             if inner.get("success"):
                 await self.ws.send_browser_action(session_id, f"✓ {msg}")
                 await self.ws.send_agent_update(session_id, "browser-specialist", "done", msg)
+                return result.get("content", "{}")
             else:
-                await self.ws.send_browser_action(session_id, f"✗ {msg}")
-                await self.ws.send_agent_update(session_id, "browser-specialist", "done", f"Failed: {msg}")
-            return result.get("content", "{}")
+                # ── FALLBACK TO VISION ────────────────────────────────────────
+                logger.warning(f"{sid} [browser-specialist] PageAgent click failed, falling back to vision…")
+                await self.ws.send_browser_action(session_id, f"⚠ PageAgent failed, trying vision fallback…")
+                await self.ws.send_agent_update(session_id, "browser-specialist", "working", "🔄 Retrying with vision-based click…")
+                
+                # Use browser-use with vision to click the element
+                fallback_task = f"Click on the element: {element_desc}"
+                fallback_result = await self._run_with_heartbeat(
+                    session_id, "browser-specialist", f"🔍 Vision fallback: {fallback_task[:50]}…",
+                    browser_tools.execute_browser_task_impl(fallback_task, self._current_target_url)
+                )
+                
+                if fallback_result.get("success"):
+                    await self.ws.send_browser_action(session_id, f"✓ Vision fallback succeeded")
+                    await self.ws.send_agent_update(session_id, "browser-specialist", "done", "Click succeeded via vision fallback")
+                    return json.dumps({"success": True, "message": "Click succeeded via vision fallback", "method": "vision"})
+                else:
+                    await self.ws.send_browser_action(session_id, f"✗ Both PageAgent and vision failed")
+                    await self.ws.send_agent_update(session_id, "browser-specialist", "done", f"Failed: {msg}")
+                    return json.dumps({"success": False, "message": f"PageAgent: {msg}. Vision fallback also failed.", "method": "both_failed"})
 
         elif tool_name == "input_text":
             index = tool_input.get("index", 0)
             text = tool_input.get("text", "")
+            element_desc = tool_input.get("element_description", f"input field at index {index}")
             logger.info(f"{sid} [browser-specialist] input_text index={index} text={text[:30]}...")
             await self.ws.send_agent_update(session_id, "browser-specialist", "working", f"Typing into element [{index}]…")
             await self.ws.send_browser_action(session_id, f"▶ Input '{text[:20]}...' into [{index}]")
             result = await pageagent_bridge.handle_input_text(tool_input)
             inner = json.loads(result.get("content", "{}"))
             msg = inner.get("message", "Done")
+            
             if inner.get("success"):
                 await self.ws.send_browser_action(session_id, f"✓ {msg}")
                 await self.ws.send_agent_update(session_id, "browser-specialist", "done", msg)
+                return result.get("content", "{}")
             else:
-                await self.ws.send_browser_action(session_id, f"✗ {msg}")
-                await self.ws.send_agent_update(session_id, "browser-specialist", "done", f"Failed: {msg}")
-            return result.get("content", "{}")
+                # ── FALLBACK TO VISION ────────────────────────────────────────
+                logger.warning(f"{sid} [browser-specialist] PageAgent input failed, falling back to vision…")
+                await self.ws.send_browser_action(session_id, f"⚠ PageAgent failed, trying vision fallback…")
+                await self.ws.send_agent_update(session_id, "browser-specialist", "working", "🔄 Retrying with vision-based input…")
+                
+                fallback_task = f"Type '{text}' into the {element_desc}"
+                fallback_result = await self._run_with_heartbeat(
+                    session_id, "browser-specialist", f"🔍 Vision fallback: typing text…",
+                    browser_tools.execute_browser_task_impl(fallback_task, self._current_target_url)
+                )
+                
+                if fallback_result.get("success"):
+                    await self.ws.send_browser_action(session_id, f"✓ Vision fallback succeeded")
+                    await self.ws.send_agent_update(session_id, "browser-specialist", "done", "Input succeeded via vision fallback")
+                    return json.dumps({"success": True, "message": "Input succeeded via vision fallback", "method": "vision"})
+                else:
+                    await self.ws.send_browser_action(session_id, f"✗ Both PageAgent and vision failed")
+                    await self.ws.send_agent_update(session_id, "browser-specialist", "done", f"Failed: {msg}")
+                    return json.dumps({"success": False, "message": f"PageAgent: {msg}. Vision fallback also failed.", "method": "both_failed"})
 
         elif tool_name == "select_option":
             index = tool_input.get("index", 0)
             option_text = tool_input.get("option_text", "")
+            element_desc = tool_input.get("element_description", f"dropdown at index {index}")
             logger.info(f"{sid} [browser-specialist] select_option index={index} option={option_text}")
             await self.ws.send_agent_update(session_id, "browser-specialist", "working", f"Selecting '{option_text}' in [{index}]…")
             await self.ws.send_browser_action(session_id, f"▶ Select '{option_text}' in [{index}]")
             result = await pageagent_bridge.handle_select_option(tool_input)
             inner = json.loads(result.get("content", "{}"))
             msg = inner.get("message", "Done")
+            
             if inner.get("success"):
                 await self.ws.send_browser_action(session_id, f"✓ {msg}")
                 await self.ws.send_agent_update(session_id, "browser-specialist", "done", msg)
+                return result.get("content", "{}")
             else:
-                await self.ws.send_browser_action(session_id, f"✗ {msg}")
-                await self.ws.send_agent_update(session_id, "browser-specialist", "done", f"Failed: {msg}")
-            return result.get("content", "{}")
+                # ── FALLBACK TO VISION ────────────────────────────────────────
+                logger.warning(f"{sid} [browser-specialist] PageAgent select failed, falling back to vision…")
+                await self.ws.send_browser_action(session_id, f"⚠ PageAgent failed, trying vision fallback…")
+                await self.ws.send_agent_update(session_id, "browser-specialist", "working", "🔄 Retrying with vision-based select…")
+                
+                fallback_task = f"Select '{option_text}' from the {element_desc}"
+                fallback_result = await self._run_with_heartbeat(
+                    session_id, "browser-specialist", f"🔍 Vision fallback: selecting option…",
+                    browser_tools.execute_browser_task_impl(fallback_task, self._current_target_url)
+                )
+                
+                if fallback_result.get("success"):
+                    await self.ws.send_browser_action(session_id, f"✓ Vision fallback succeeded")
+                    await self.ws.send_agent_update(session_id, "browser-specialist", "done", "Select succeeded via vision fallback")
+                    return json.dumps({"success": True, "message": "Select succeeded via vision fallback", "method": "vision"})
+                else:
+                    await self.ws.send_browser_action(session_id, f"✗ Both PageAgent and vision failed")
+                    await self.ws.send_agent_update(session_id, "browser-specialist", "done", f"Failed: {msg}")
+                    return json.dumps({"success": False, "message": f"PageAgent: {msg}. Vision fallback also failed.", "method": "both_failed"})
 
         elif tool_name == "scroll_page":
             direction = tool_input.get("direction", "down")
@@ -912,12 +975,28 @@ Test Results Collected: {len(self._test_results)}
             result = await pageagent_bridge.handle_scroll_page(tool_input)
             inner = json.loads(result.get("content", "{}"))
             msg = inner.get("message", "Done")
+            
             if inner.get("success"):
                 await self.ws.send_browser_action(session_id, f"✓ {msg}")
                 await self.ws.send_agent_update(session_id, "browser-specialist", "done", msg)
+                return result.get("content", "{}")
             else:
-                await self.ws.send_browser_action(session_id, f"✗ {msg}")
-            return result.get("content", "{}")
+                # ── FALLBACK TO VISION ────────────────────────────────────────
+                logger.warning(f"{sid} [browser-specialist] PageAgent scroll failed, falling back to vision…")
+                await self.ws.send_browser_action(session_id, f"⚠ PageAgent failed, trying vision fallback…")
+                
+                fallback_task = f"Scroll {direction} on the page"
+                fallback_result = await self._run_with_heartbeat(
+                    session_id, "browser-specialist", f"🔍 Vision fallback: scrolling…",
+                    browser_tools.execute_browser_task_impl(fallback_task, self._current_target_url)
+                )
+                
+                if fallback_result.get("success"):
+                    await self.ws.send_browser_action(session_id, f"✓ Vision fallback succeeded")
+                    return json.dumps({"success": True, "message": "Scroll succeeded via vision fallback", "method": "vision"})
+                else:
+                    await self.ws.send_browser_action(session_id, f"✗ {msg}")
+                    return json.dumps({"success": False, "message": f"PageAgent: {msg}. Vision fallback also failed.", "method": "both_failed"})
 
         else:
             logger.warning(f"{sid} Unknown tool: {tool_name}")

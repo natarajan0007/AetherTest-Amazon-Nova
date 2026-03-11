@@ -599,7 +599,8 @@ def get_click_element_tool_definition() -> dict:
         "name": "click_element",
         "description": (
             "Click an interactive element by its index number from get_page_state. "
-            "Example: click_element(index=0) clicks the first interactive element."
+            "Example: click_element(index=0) clicks the first interactive element. "
+            "If PageAgent fails, automatically falls back to vision-based clicking."
         ),
         "input_schema": {
             "type": "object",
@@ -607,6 +608,10 @@ def get_click_element_tool_definition() -> dict:
                 "index": {
                     "type": "integer",
                     "description": "The index number of the element to click (from get_page_state output)"
+                },
+                "element_description": {
+                    "type": "string",
+                    "description": "Optional: Human-readable description of the element (e.g., 'Login button', 'Submit form'). Used for vision fallback if PageAgent fails."
                 }
             },
             "required": ["index"],
@@ -619,7 +624,8 @@ def get_input_text_tool_definition() -> dict:
         "name": "input_text",
         "description": (
             "Type text into an input field by its index number from get_page_state. "
-            "Example: input_text(index=1, text='user@example.com')"
+            "Example: input_text(index=1, text='user@example.com'). "
+            "If PageAgent fails, automatically falls back to vision-based input."
         ),
         "input_schema": {
             "type": "object",
@@ -631,6 +637,10 @@ def get_input_text_tool_definition() -> dict:
                 "text": {
                     "type": "string",
                     "description": "The text to type into the field"
+                },
+                "element_description": {
+                    "type": "string",
+                    "description": "Optional: Human-readable description of the field (e.g., 'email input', 'password field'). Used for vision fallback if PageAgent fails."
                 }
             },
             "required": ["index", "text"],
@@ -643,7 +653,8 @@ def get_select_option_tool_definition() -> dict:
         "name": "select_option",
         "description": (
             "Select an option from a dropdown by element index and option text. "
-            "Example: select_option(index=5, option_text='United States')"
+            "Example: select_option(index=5, option_text='United States'). "
+            "If PageAgent fails, automatically falls back to vision-based selection."
         ),
         "input_schema": {
             "type": "object",
@@ -655,6 +666,10 @@ def get_select_option_tool_definition() -> dict:
                 "option_text": {
                     "type": "string",
                     "description": "The visible text of the option to select"
+                },
+                "element_description": {
+                    "type": "string",
+                    "description": "Optional: Human-readable description of the dropdown (e.g., 'country selector', 'language dropdown'). Used for vision fallback if PageAgent fails."
                 }
             },
             "required": ["index", "option_text"],
