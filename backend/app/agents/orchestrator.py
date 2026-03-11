@@ -64,8 +64,9 @@ This analysis will be shown to the user, so be clear and concise.
 ### Phase 2 — Test Case Generation
 IMPORTANT: Call register_test_cases ONCE with ALL test cases in a single call.
 Do NOT call register_test_cases multiple times — put all test cases in one array.
-Generate the exact number of BDD test cases specified (3, 5, 20, or other).
-Cover: happy path, negative cases, and edge cases proportionally.
+Generate the EXACT number of test cases specified in the user prompt - this is critical.
+If the user explicitly requests a specific number (e.g., "generate only 2 test cases"), you MUST generate exactly that many.
+Cover: happy path, negative cases, and edge cases proportionally based on the count.
 Each needs: id (TC-001, TC-002, TC-003 format), title, description, steps ([{action, expected}]).
 
 ### Phase 3+4 — Execution + Validation (INTERLEAVED per test case)
@@ -103,6 +104,9 @@ Call save_report with a detailed report_data object containing:
 - Do NOT pass screenshot_b64 to analyze_screenshot — the system handles it automatically.
 - Always pass test_id to analyze_screenshot (e.g. "TC-001") so the UI updates correctly.
 - Complete ALL phases before finishing.
+- CRITICAL: You MUST execute ALL registered test cases. Do NOT stop after executing just one test case.
+- CRITICAL: Do NOT call save_report until ALL test cases have been executed and validated.
+- If you registered N test cases, you must have N test outcomes in the report.
 
 ## Automatic Retry on Failure
 If a test case FAILS after using PageAgent tools (click_element, input_text, etc.):
@@ -638,12 +642,37 @@ Test Results Collected: {len(self._test_results)}
                 logger.info(f"{sid} Memory context injected into prompt")
                 await self.ws.send_agent_update(session_id, "orchestrator", "working", "📚 Found relevant past experiences")
 
+            # ── Parse user requirement for explicit test count override ────────
+            # If user explicitly specifies test count in requirement, use that instead
+            import re
+            explicit_count_match = re.search(
+                r'(?:generate|create|make|run|execute)?\s*(?:only|exactly|just)?\s*(\d+)\s*(?:test\s*cases?|tests?|scenarios?)',
+                requirement.lower()
+            )
+            effective_test_count = test_case_count
+            if explicit_count_match:
+                explicit_count = int(explicit_count_match.group(1))
+                if explicit_count != test_case_count:
+                    logger.info(f"{sid} User explicitly requested {explicit_count} test cases (overriding mode default of {test_case_count})")
+                    effective_test_count = explicit_count
+
             cred_hint = f"\nStored credential name to use: {credential_name}" if credential_name else ""
+            
+            # Build test count instruction - prioritize user's explicit request
+            if explicit_count_match:
+                test_count_instruction = (
+                    f"Test case count: The user explicitly requested {effective_test_count} test cases in their requirement. "
+                    f"Generate EXACTLY {effective_test_count} test cases - no more, no less. "
+                    f"This overrides any default settings."
+                )
+            else:
+                test_count_instruction = f"Test case count: generate exactly {effective_test_count} BDD test cases in Phase 2."
+            
             user_prompt = (
                 f"Execute the full AetherTest STLC pipeline.\n\n"
                 f"Requirement: {requirement}\n"
                 f"Target URL: {target_url}{cred_hint}\n"
-                f"Test case count: generate exactly {test_case_count} BDD test cases in Phase 2.\n"
+                f"{test_count_instruction}\n"
                 f"{memory_context}\n"
                 f"Begin Phase 1 now."
             )
