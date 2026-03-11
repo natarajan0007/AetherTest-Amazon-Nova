@@ -362,6 +362,144 @@ Test Results Collected: {len(self._test_results)}
         except Exception as e:
             logger.warning(f"{sid} Failed to store failure memory: {e}")
 
+    async def _generate_partial_report(
+        self,
+        session_id: str,
+        error_message: str,
+    ) -> None:
+        """Generate a partial report when pipeline fails mid-execution.
+        
+        This ensures users can see results for test cases that were executed
+        before the failure (e.g., token expiry, network error).
+        """
+        sid = _sid(session_id)
+        
+        # Only generate if we have test cases or results
+        if not self._test_cases and not self._test_results:
+            logger.info(f"{sid} No test data to generate partial report")
+            return
+        
+        try:
+            logger.info(f"{sid} Generating partial report for {len(self._test_results)} executed tests out of {len(self._test_cases)} total")
+            await self.ws.send_agent_update(session_id, "report-generator", "working", "Generating partial report due to pipeline error…")
+            
+            # Build test outcomes from tracked results
+            test_outcomes = []
+            executed_ids = {r.get("test_id") for r in self._test_results}
+            
+            # Add executed test results
+            for result in self._test_results:
+                test_outcomes.append({
+                    "test_id": result.get("test_id", "Unknown"),
+                    "title": self._get_test_title(result.get("test_id")),
+                    "verdict": result.get("verdict", "UNKNOWN"),
+                    "details": result.get("explanation", ""),
+                    "steps_executed": "Completed before error",
+                })
+            
+            # Mark remaining test cases as NOT_EXECUTED
+            for tc in self._test_cases:
+                tc_id = tc.get("id", "")
+                if tc_id not in executed_ids:
+                    test_outcomes.append({
+                        "test_id": tc_id,
+                        "title": tc.get("title", "Unknown"),
+                        "verdict": "NOT_EXECUTED",
+                        "details": f"Test not executed due to pipeline error: {error_message[:100]}",
+                        "steps_executed": "None - pipeline failed before execution",
+                    })
+            
+            # Calculate stats
+            passed = sum(1 for t in test_outcomes if t.get("verdict") == "PASS")
+            failed = sum(1 for t in test_outcomes if t.get("verdict") == "FAIL")
+            blocked = sum(1 for t in test_outcomes if t.get("verdict") == "BLOCKED")
+            not_executed = sum(1 for t in test_outcomes if t.get("verdict") == "NOT_EXECUTED")
+            total = len(test_outcomes)
+            executed = passed + failed + blocked
+            
+            # Quality score based on executed tests only
+            quality_score = (passed / executed * 100) if executed > 0 else 0
+            
+            # Build report data
+            report_data = {
+                "test_outcomes": test_outcomes,
+                "quality_score": quality_score,
+                "executive_summary": (
+                    f"⚠️ PARTIAL REPORT - Pipeline failed during execution.\n\n"
+                    f"Error: {error_message}\n\n"
+                    f"Executed {executed}/{total} test cases before failure.\n"
+                    f"Results: {passed} passed, {failed} failed, {blocked} blocked, {not_executed} not executed.\n"
+                    f"Quality score (based on executed tests): {quality_score:.0f}%"
+                ),
+                "passed": passed,
+                "failed": failed,
+                "blocked": blocked,
+                "not_executed": not_executed,
+                "total_tests": total,
+                "executed_tests": executed,
+                "environment": {
+                    "url": self._current_target_url,
+                    "browser": "Chrome (CDP)",
+                    "timestamp": datetime.now().isoformat(),
+                    "status": "PARTIAL - Pipeline Error",
+                },
+                "recommendations": [
+                    f"Pipeline failed with error: {error_message[:200]}",
+                    "Review executed test results above",
+                    "Re-run the test session after resolving the error",
+                    "If using session tokens, ensure credentials are refreshed before long test runs",
+                ],
+                "pipeline_error": {
+                    "message": error_message,
+                    "tests_executed": executed,
+                    "tests_remaining": not_executed,
+                },
+            }
+            
+            # Save the partial report
+            from ..database import _db_path
+            import aiosqlite
+            async with aiosqlite.connect(_db_path) as db:
+                db.row_factory = aiosqlite.Row
+                storage_tools.init_storage_tools(db, self.storage_svc, session_id)
+                
+                result = await storage_tools.handle_save_report({"report_data": report_data})
+                inner = json.loads(result.get("content", "{}"))
+                rep_id = inner.get("report_id", "")
+                
+                if rep_id:
+                    logger.info(f"{sid} Partial report saved: {rep_id}")
+                    
+                    # Send report to frontend
+                    await self.ws.send_report(session_id, rep_id, report_data)
+                    
+                    # Send completion with partial status
+                    summary = f"⚠️ Partial results: {passed}/{executed} executed tests passed ({not_executed} not executed due to error)"
+                    await self.ws.send_complete(session_id, summary, quality_score)
+                    self._complete_sent = True
+                    
+                    await self.ws.send_agent_update(
+                        session_id, "report-generator", "done",
+                        f"Partial report saved — {passed}/{executed} passed, {not_executed} not executed"
+                    )
+                    
+                    # Update session with report ID
+                    await self.session_svc.update_session(
+                        session_id, SessionUpdate(status="failed", report_id=rep_id)
+                    )
+                else:
+                    logger.warning(f"{sid} Failed to save partial report")
+                    
+        except Exception as e:
+            logger.warning(f"{sid} Failed to generate partial report: {e}")
+
+    def _get_test_title(self, test_id: str) -> str:
+        """Get test case title by ID from tracked test cases."""
+        for tc in self._test_cases:
+            if tc.get("id") == test_id:
+                return tc.get("title", test_id)
+        return test_id
+
     # ── Public entry point ────────────────────────────────────────────────────
 
     async def run(
@@ -407,15 +545,22 @@ Test Results Collected: {len(self._test_results)}
                 await self._run_live_pipeline(session_id, requirement, target_url, credential_name, message_queue, test_case_count)
         except asyncio.CancelledError:
             logger.warning(f"{sid} Pipeline CANCELLED by user")
-            await self.ws.send_cancelled(session_id)
-            await self.session_svc.update_session(session_id, SessionUpdate(status="cancelled"))
+            # Generate partial report for any executed tests before cancellation
+            await self._generate_partial_report(session_id, "Pipeline cancelled by user")
+            if not self._complete_sent:
+                await self.ws.send_cancelled(session_id)
+                await self.session_svc.update_session(session_id, SessionUpdate(status="cancelled"))
             # Store partial learnings even on cancellation
             await self._store_failure_memory(session_id, "cancelled", "Pipeline cancelled by user")
             raise
         except Exception as e:
-            logger.exception(f"{sid} Pipeline FAILED — {type(e).__name__}: {e}")
-            await self.ws.send_error(session_id, f"Pipeline error: {e}")
-            await self.session_svc.update_session(session_id, SessionUpdate(status="failed"))
+            error_msg = f"{type(e).__name__}: {e}"
+            logger.exception(f"{sid} Pipeline FAILED — {error_msg}")
+            # Generate partial report for any executed tests before failure
+            await self._generate_partial_report(session_id, str(e))
+            if not self._complete_sent:
+                await self.ws.send_error(session_id, f"Pipeline error: {e}")
+                await self.session_svc.update_session(session_id, SessionUpdate(status="failed"))
             # Store failure in memory so agent learns from errors
             await self._store_failure_memory(session_id, "failed", str(e))
         finally:
@@ -856,7 +1001,6 @@ Test Results Collected: {len(self._test_results)}
             else:
                 logger.warning(f"{sid} [report-generator] no report_id returned")
             return result.get("content", "{}")
-
 
         # ── PageAgent Tools (with Vision Fallback) ────────────────────────────
         elif tool_name == "get_page_state":

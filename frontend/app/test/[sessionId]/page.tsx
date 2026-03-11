@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { useTestStore } from "@/store/testStore";
@@ -13,7 +13,7 @@ import { RecordingPlayer }  from "@/components/RecordingPlayer";
 import {
   Activity, ArrowLeft, Wifi, WifiOff,
   Bot, MessageSquare, FlaskConical, Trophy, Film,
-  Square, PanelLeftClose, PanelLeftOpen, History,
+  Square, PanelLeftClose, PanelLeftOpen, History, GripVertical,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -35,6 +35,60 @@ export default function TestPage() {
   const [collapsed, setCollapsed] = useState(false);
   const [stopping,  setStopping]  = useState(false);
   const [restored,  setRestored]  = useState(false);
+  
+  // ── Resizable sidebar state ───────────────────────────────────────────────
+  const MIN_WIDTH = 280;
+  const MAX_WIDTH = 800;
+  const DEFAULT_WIDTH = 400;
+  
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('aethertest-sidebar-width');
+      return saved ? Math.min(Math.max(parseInt(saved, 10), MIN_WIDTH), MAX_WIDTH) : DEFAULT_WIDTH;
+    }
+    return DEFAULT_WIDTH;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+
+  // Save sidebar width to localStorage
+  useEffect(() => {
+    if (!collapsed && sidebarWidth !== DEFAULT_WIDTH) {
+      localStorage.setItem('aethertest-sidebar-width', String(sidebarWidth));
+    }
+  }, [sidebarWidth, collapsed]);
+
+  // Handle resize drag
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!sidebarRef.current) return;
+      const newWidth = e.clientX;
+      setSidebarWidth(Math.min(Math.max(newWidth, MIN_WIDTH), MAX_WIDTH));
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing]);
 
   // ── Restore session from history if navigating to a past session ──────────
   const testStoreState   = useTestStore.getState;
@@ -199,11 +253,16 @@ export default function TestPage() {
       <div className="flex flex-1 overflow-hidden">
 
         {/* ── Collapsible sidebar ──────────────────────────────────────── */}
-        <div className={`
-          flex flex-col border-r border-surface-border bg-surface-card/40 shrink-0
-          transition-all duration-300 ease-in-out overflow-hidden
-          ${collapsed ? "w-14" : "w-[400px]"}
-        `}>
+        <div 
+          ref={sidebarRef}
+          className={`
+            flex flex-col border-r border-surface-border bg-surface-card/40 shrink-0
+            transition-all ease-in-out overflow-hidden relative
+            ${collapsed ? "w-14" : ""}
+            ${isResizing ? "transition-none" : "duration-300"}
+          `}
+          style={{ width: collapsed ? undefined : sidebarWidth }}
+        >
           {collapsed ? (
             /* Icon-only mode */
             <div className="flex flex-col items-center py-3 gap-1">
@@ -300,6 +359,24 @@ export default function TestPage() {
                 )}
               </div>
             </>
+          )}
+          
+          {/* ── Resize handle ──────────────────────────────────────────── */}
+          {!collapsed && (
+            <div
+              onMouseDown={handleMouseDown}
+              className={`
+                absolute top-0 right-0 w-1.5 h-full cursor-col-resize z-10
+                flex items-center justify-center
+                hover:bg-brand-500/30 transition-colors
+                ${isResizing ? "bg-brand-500/50" : "bg-transparent"}
+              `}
+            >
+              <div className={`
+                w-0.5 h-8 rounded-full transition-colors
+                ${isResizing ? "bg-brand-400" : "bg-slate-700 group-hover:bg-slate-500"}
+              `} />
+            </div>
           )}
         </div>
 

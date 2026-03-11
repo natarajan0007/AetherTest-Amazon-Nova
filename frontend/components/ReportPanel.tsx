@@ -20,9 +20,9 @@ const QualityScoreOrb = dynamic(
 interface TestOutcome {
   test_id: string;
   title?: string;
-  verdict: "PASS" | "FAIL" | "BLOCKED";
+  verdict: "PASS" | "FAIL" | "BLOCKED" | "NOT_EXECUTED";
   details?: string;
-  steps_executed?: string[];
+  steps_executed?: string[] | string;
 }
 
 export function ReportPanel() {
@@ -53,8 +53,12 @@ export function ReportPanel() {
   const passed  = testOutcomes.filter(t => t.verdict === "PASS").length || Number(data.passed ?? 0);
   const failed  = testOutcomes.filter(t => t.verdict === "FAIL").length || Number(data.failed ?? 0);
   const blocked = testOutcomes.filter(t => t.verdict === "BLOCKED").length || Number(data.blocked ?? 0);
+  const notExecuted = testOutcomes.filter(t => t.verdict === "NOT_EXECUTED").length || Number(data.not_executed ?? 0);
   const total   = testOutcomes.length || Number(data.total_tests ?? data.total_test_cases ?? 0);
   const score   = typeof qualityScore === "number" ? qualityScore : 0;
+  
+  // Check if this is a partial report (pipeline error)
+  const isPartialReport = Boolean(data.pipeline_error) || notExecuted > 0;
   
   // Extract additional report data
   const executiveSummary = (data.executive_summary as string) || 
@@ -81,11 +85,12 @@ export function ReportPanel() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className={`grid gap-2 ${notExecuted > 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
         {[
           { Icon: CheckCircle2,  count: passed,  label: "Passed",  color: "success" as const },
           { Icon: XCircle,       count: failed,  label: "Failed",  color: "error" as const },
           { Icon: AlertTriangle, count: blocked, label: "Blocked", color: "warning" as const },
+          ...(notExecuted > 0 ? [{ Icon: Clock, count: notExecuted, label: "Not Run", color: "muted" as const }] : []),
         ].map(({ Icon, count, label, color }, i) => (
           <motion.div
             key={label}
@@ -94,23 +99,46 @@ export function ReportPanel() {
             transition={{ delay: i * 0.1 }}
           >
             <GlassCard
-              glow={color === "success" ? "success" : color === "error" ? "error" : "warning"}
+              glow={color === "success" ? "success" : color === "error" ? "error" : color === "warning" ? "warning" : undefined}
               padding="sm"
               className="text-center"
             >
               <Icon className={`w-4 h-4 mx-auto mb-1 ${
                 color === "success" ? "text-green-400" :
-                color === "error" ? "text-red-400" : "text-amber-400"
+                color === "error" ? "text-red-400" : 
+                color === "warning" ? "text-amber-400" : "text-slate-500"
               }`} />
               <div className={`text-xl font-bold font-mono ${
                 color === "success" ? "text-green-400" :
-                color === "error" ? "text-red-400" : "text-amber-400"
+                color === "error" ? "text-red-400" : 
+                color === "warning" ? "text-amber-400" : "text-slate-500"
               }`}>{count}</div>
               <div className="text-[10px] text-slate-500">{label}</div>
             </GlassCard>
           </motion.div>
         ))}
       </div>
+
+      {/* Partial Report Warning */}
+      {isPartialReport && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+        >
+          <GlassCard padding="sm" glow="error">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+              <div>
+                <p className="text-[11px] font-semibold text-amber-400">Partial Report - Pipeline Error</p>
+                <p className="text-[10px] text-slate-400">
+                  {notExecuted} test{notExecuted !== 1 ? 's were' : ' was'} not executed due to a pipeline error.
+                </p>
+              </div>
+            </div>
+          </GlassCard>
+        </motion.div>
+      )}
 
       {/* Executive Summary */}
       <motion.div
@@ -165,6 +193,8 @@ export function ReportPanel() {
                         ? "border-green-500/30 bg-green-500/5" 
                         : outcome.verdict === "FAIL"
                         ? "border-red-500/30 bg-red-500/5"
+                        : outcome.verdict === "NOT_EXECUTED"
+                        ? "border-slate-500/30 bg-slate-500/5"
                         : "border-amber-500/30 bg-amber-500/5"
                     }`}
                   >
@@ -173,6 +203,8 @@ export function ReportPanel() {
                         <CheckCircle2 className="w-3.5 h-3.5 text-green-400 flex-shrink-0" />
                       ) : outcome.verdict === "FAIL" ? (
                         <XCircle className="w-3.5 h-3.5 text-red-400 flex-shrink-0" />
+                      ) : outcome.verdict === "NOT_EXECUTED" ? (
+                        <Clock className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
                       ) : (
                         <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
                       )}
@@ -184,9 +216,11 @@ export function ReportPanel() {
                               ? "bg-green-500/20 text-green-400" 
                               : outcome.verdict === "FAIL"
                               ? "bg-red-500/20 text-red-400"
+                              : outcome.verdict === "NOT_EXECUTED"
+                              ? "bg-slate-500/20 text-slate-400"
                               : "bg-amber-500/20 text-amber-400"
                           }`}>
-                            {outcome.verdict}
+                            {outcome.verdict === "NOT_EXECUTED" ? "NOT RUN" : outcome.verdict}
                           </span>
                         </div>
                         {outcome.title && (
