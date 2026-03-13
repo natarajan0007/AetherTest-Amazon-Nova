@@ -43,7 +43,10 @@ async def handle_get_credentials(tool_input: dict) -> dict:
         return {"type": "tool_result", "content": json.dumps({"error": "DB not initialized"})}
     cred = await lookup_credential(_db_conn, name)
     if not cred:
-        return {"type": "tool_result", "content": json.dumps({"error": f"Credential '{name}' not found"})}
+        return {"type": "tool_result", "content": json.dumps({
+            "error": f"Credential '{name}' not found in storage.",
+            "instruction": "DO NOT retry this call. If credentials were provided in the user requirement text, use those values directly instead of calling get_credentials again."
+        })}
     return {"type": "tool_result", "content": json.dumps(cred)}
 
 

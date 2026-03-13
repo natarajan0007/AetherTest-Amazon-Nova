@@ -100,13 +100,14 @@ Call save_report with a detailed report_data object containing:
 - Always call register_test_cases ONCE with ALL test cases in a single array.
 - Use get_page_state before interacting with elements to get current indices.
 - Use click_element, input_text, select_option with indices from get_page_state.
-- If credentials are needed, call get_credentials first.
+- CREDENTIALS: Only call get_credentials if a stored credential NAME was explicitly provided in the user prompt (e.g., "credential_name: admin"). If credentials are provided directly in the requirement text (e.g., "log in using standard_user with password secret_sauce"), use those values directly - do NOT call get_credentials.
 - Do NOT pass screenshot_b64 to analyze_screenshot — the system handles it automatically.
 - Always pass test_id to analyze_screenshot (e.g. "TC-001") so the UI updates correctly.
 - Complete ALL phases before finishing.
 - CRITICAL: You MUST execute ALL registered test cases. Do NOT stop after executing just one test case.
 - CRITICAL: Do NOT call save_report until ALL test cases have been executed and validated.
 - If you registered N test cases, you must have N test outcomes in the report.
+- CRITICAL: If get_credentials returns "not found", do NOT retry it. Use the credentials from the requirement text instead.
 
 ## Automatic Retry on Failure
 If a test case FAILS after using PageAgent tools (click_element, input_text, etc.):
